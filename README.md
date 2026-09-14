@@ -78,12 +78,16 @@ because accent placement is part of a rhythm rather than part of a pitch choice.
 
 Two consequences worth knowing:
 
-- **Generation is idempotent.** The seed is derived from the parameters
-  (`combineSeed(trackIndex, pulses, steps)`), not drawn fresh, so clicking E
-  twice gives the same phrase. Moving a fader and clicking again *does* change
-  the output — the random stream is identical, but a weighted choice against
-  different weights lands elsewhere. That is "evolve rather than re-roll"
-  without a seed knob to manage.
+- **Every generate gives a new phrase, and every phrase is reproducible.** Each
+  track stores a seed that advances on each press of E, so pressing it
+  repeatedly varies the pattern instead of returning the same one. The seed plus
+  the current mixer fully determines the notes, so a phrase can be returned to.
+  An earlier version derived the seed from the parameters alone, which made
+  generate idempotent — reported from use as "the E(k,n) button doesn't work",
+  which was the correct reading: a generate button that does nothing when
+  pressed is broken, however defensible the reasoning. Surfacing the seed as a
+  control is the researched next step (Marbles' DEJA VU, the Turing Machine's
+  mutation knob).
 - **Pitches are snapped into the scale**, so a weighted semitone that falls
   between scale notes lands on the nearest one rather than being discarded. The
   chromatic faders plus a quantiser is what the hardware does. It also means a

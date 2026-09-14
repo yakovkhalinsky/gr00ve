@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { DEFAULT_MIX, inScale } from '@gr00ve/core';
-import { euclidCells, useGr00ve } from './store.ts';
+import { euclidCells, generateCells, useGr00ve } from './store.ts';
 
 /**
  * Only the pure helpers and the store's own transitions are testable here.
@@ -322,16 +322,59 @@ test('the root fader and the octave fader land an octave apart', () => {
   assert.deepEqual(octave, root.map((p) => (p === null ? null : p + 12)));
 });
 
-test('generation is idempotent for the same parameters', () => {
-  // Clicking E twice must not re-roll: the seed comes from the parameters, so
-  // the phrase is stable until the performer changes something.
+test('every generate produces a new pattern', () => {
+  // The regression this guards, reported from use: a seed derived from the
+  // parameters alone made generate idempotent, so pressing it repeatedly with
+  // the same k and n returned the identical phrase. It read as "the E(k,n)
+  // button doesn't work", which is the correct reading — a generate button that
+  // does nothing when pressed is broken, however defensible the reasoning.
+  useGr00ve.setState({ mix: DEFAULT_MIX });
+
+  s().euclidize(6, 5, 16);
+  const first = pitchesOf(6).join(',');
+  s().euclidize(6, 5, 16);
+  const second = pitchesOf(6).join(',');
+  s().euclidize(6, 5, 16);
+  const third = pitchesOf(6).join(',');
+
+  assert.notEqual(second, first, 'the second generate returned the first pattern');
+  assert.notEqual(third, second, 'the third generate returned the second pattern');
+});
+
+test('the seed advances on every generate, and is stored on the track', () => {
+  const before = s().tracks[6]?.seed ?? 0;
+  s().euclidize(6, 5, 16);
+  const after = s().tracks[6]?.seed ?? 0;
+  assert.notEqual(after, before, 'the seed did not advance');
+});
+
+test('the same seed and weights reproduce the same pattern', () => {
+  // What the idempotency was reaching for, kept: a seed plus the current mixer
+  // fully determines the phrase, so a pattern can be recalled rather than lost.
+  // Surfacing the seed as a control is the researched next step.
   useGr00ve.setState({ mix: DEFAULT_MIX });
   s().euclidize(6, 5, 16);
-  const first = s().tracks[6]?.cells;
 
+  const track = s().tracks[6];
+  assert.ok(track);
+  const replay = generateCells({
+    pulses: 5,
+    steps: 16,
+    rotation: track.rotation,
+    seed: track.seed,
+    mix: DEFAULT_MIX,
+    root: s().root,
+    scale: s().scale,
+    register: track.register,
+  });
+
+  assert.deepEqual(replay, track.cells);
+});
+
+test('generating does not disturb the other tracks', () => {
+  const sibling = s().tracks[5];
   s().euclidize(6, 5, 16);
-
-  assert.deepEqual(s().tracks[6]?.cells, first);
+  assert.equal(s().tracks[5], sibling, 'a sibling track was rebuilt');
 });
 
 test('euclidize keeps exactly `pulses` onsets, for any k and n', () => {

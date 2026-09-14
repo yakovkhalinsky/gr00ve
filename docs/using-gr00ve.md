@@ -170,8 +170,11 @@ Euclidean rhythm is the one generator here whose two controls are readable with
 no training: you turn `k` and `n` and hear exactly what they mean. Four-on-the-
 floor is E(4,16); three-against-eight is the tresillo.
 
-**Generation is repeatable.** Clicking E twice with the same settings gives the
-same phrase. Change a pitch fader or `k`/`n` and it gives a different one.
+**Every press gives a new phrase.** Each track keeps a generation seed that
+advances whenever you generate, so pressing E repeatedly varies the pattern
+rather than returning the same one. The seed is stored, which means a phrase is
+reproducible rather than lost — though there is no control to dial a particular
+seed back yet.
 
 ### MIDI out
 

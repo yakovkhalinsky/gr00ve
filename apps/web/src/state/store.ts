@@ -73,6 +73,22 @@ export interface TrackState {
    * operator catalogue and is the natural way to surface it.
    */
   readonly rotation: number;
+  /**
+   * Generation seed. Advanced on every generate.
+   *
+   * The pattern is a pure function of this and the current mixer, so storing it
+   * keeps a phrase reproducible — the same seed and weights give the same notes
+   * — while still letting the generate button produce something *new* each
+   * time. An earlier version derived the seed from the parameters alone, which
+   * made generate idempotent: clicking it twice with the same k and n returned
+   * the identical pattern, and a button that does nothing when pressed reads as
+   * broken regardless of how defensible the reasoning was.
+   *
+   * Surfacing it as a control — so a phrase can be dialled back to, the way
+   * Marbles' DEJA VU and the Turing Machine's mutation knob work — is the
+   * researched next step.
+   */
+  readonly seed: number;
 }
 
 export interface Gr00veState {
@@ -220,11 +236,10 @@ export function euclidCells(
  * generator all behave identically — and so there is a single function to look
  * at when the output is wrong.
  *
- * The seed is derived from the *parameters* rather than drawn fresh, which
- * makes generation idempotent: clicking E(5,8) twice gives the same phrase,
- * while moving a pitch fader and clicking again gives a different one (the
- * random stream is identical; a weighted choice against different weights just
- * lands elsewhere). See `combineSeed`.
+ * Callers pass the seed explicitly, and it is stored on the track: the seed
+ * plus the mixer fully determines the notes, so a phrase is reproducible rather
+ * than lost, while `euclidize` advances it so each press produces something
+ * new. See `TrackState.seed`.
  */
 export function generateCells(opts: {
   readonly pulses: number;
@@ -253,6 +268,7 @@ function seedTrack(index: number, root: number, scale: ScaleName): TrackState {
   const pattern: SeedSpec = SEED[index % SEED.length] ?? {
     pulses: 4, steps: 16, rotation: 0, register: 0, kind: 'voice', drum: 'kick',
   };
+  const seed = combineSeed(index, pattern.pulses, pattern.steps);
   return {
     id: `track-${index + 1}`,
     name: `Track ${index + 1}`,
@@ -260,7 +276,7 @@ function seedTrack(index: number, root: number, scale: ScaleName): TrackState {
       pulses: pattern.pulses,
       steps: pattern.steps,
       rotation: pattern.rotation,
-      seed: combineSeed(index, pattern.pulses, pattern.steps),
+      seed,
       mix: DEFAULT_MIX,
       root,
       scale,
@@ -275,6 +291,7 @@ function seedTrack(index: number, root: number, scale: ScaleName): TrackState {
     drum: pattern.drum ?? DEFAULT_KIT[index % DEFAULT_KIT.length] ?? 'kick',
     register: pattern.register,
     rotation: pattern.rotation,
+    seed,
   };
 }
 
@@ -343,6 +360,13 @@ export const useGr00ve = create<Gr00veState>()(
       const { tracks, root, scale, mix } = get();
       const track = tracks[trackIndex];
       if (!track) return;
+
+      // Advance the seed, so generate produces something new every time. A
+      // seed derived from the parameters alone made this idempotent, and a
+      // generate button that returns the identical phrase when pressed reads
+      // as broken — which is exactly how it was reported.
+      const seed = (track.seed + 1) >>> 0;
+
       const cells = generateCells({
         pulses,
         steps,
@@ -350,16 +374,15 @@ export const useGr00ve = create<Gr00veState>()(
         // beats 2 and 4 rather than snapping it back to the even-but-wrong
         // phase 0 the pattern shape alone would give.
         rotation: track.rotation,
-        // Seeded from the parameters: idempotent for a given E(k,n), but still
-        // responsive to the pitch faders, because the weights changed even
-        // though the random stream did not.
-        seed: combineSeed(trackIndex, pulses, steps),
+        seed,
         mix,
         root,
         scale,
         register: track.register,
       });
-      const next = tracks.map((t, i) => (i === trackIndex ? { ...t, cells, length: steps } : t));
+      const next = tracks.map((t, i) =>
+        (i === trackIndex ? { ...t, cells, length: steps, seed } : t),
+      );
       set({ tracks: next });
     },
 

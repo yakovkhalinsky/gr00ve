@@ -33,16 +33,15 @@ export function randInt(rng: Rng, n: number): number {
 /**
  * Derive a stable seed from several small integers.
  *
- * Used to make regeneration idempotent: seeding from the *parameters* of a
- * generate action means clicking E(5,8) twice produces the same phrase rather
- * than a fresh roll, while changing a pitch fader still changes the output —
- * the random stream is identical, but a weighted choice against different
- * weights lands somewhere else.
+ * Mixes parameters into one seed where a starting point is wanted — seeding a
+ * track's first pattern from its index and shape, say — so that the same inputs
+ * always give the same phrase.
  *
- * That gives "evolve rather than re-roll" without a seed knob to manage. When
- * deliberate variation is wanted, a seed control that the performer can turn is
- * the researched next step (Marbles' DEJA VU, the Turing Machine's mutation
- * probability).
+ * Note this deliberately does *not* make generation idempotent by itself. A
+ * generate action seeded only from its own parameters returns the identical
+ * pattern every press, which reads as the button being broken; variation comes
+ * from a seed that advances (see `TrackState.seed` in the web app). Use this
+ * where a stable starting point is the goal, not where a fresh result is.
  *
  * FNV-1a over the byte-expanded inputs — cheap, and well spread for small
  * tuples, which is all this is ever asked to do.
