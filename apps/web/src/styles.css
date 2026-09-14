@@ -63,13 +63,11 @@ body {
 }
 .transport__play[aria-pressed='true'] { background: var(--accent); border-color: var(--accent); }
 
-.transport__scale { display: flex; align-items: center; gap: 12px; margin-left: auto; }
-.transport__scale label { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: 12px; }
-.transport__scale select { min-height: 36px; padding: 0 8px; background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; }
-.transport__root { font-variant-numeric: tabular-nums; color: var(--muted); }
-
 .transport__help {
   align-self: center;
+  /* Pushes to the right edge, now that the scale selector has moved out of the
+   * transport bar and taken its `margin-left: auto` with it. */
+  margin-left: auto;
   font-size: 12px;
   color: var(--muted);
   text-decoration: underline;
@@ -116,8 +114,17 @@ body {
 /* --- Pitch probability mixer --------------------------------------------- */
 
 .mixer { padding: 14px 18px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
-.mixer__title, .generator__title { margin: 0 0 4px; font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
-.mixer__hint, .generator__hint { margin: 0 0 12px; font-size: 12px; color: var(--muted); max-width: 62ch; }
+
+/* Title and scale share a row: the scale is this panel's subject, since it
+ * decides which notes exist and therefore how many faders there are. */
+.mixer__head { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; justify-content: space-between; }
+.mixer__scale { display: flex; align-items: center; gap: 10px; }
+.mixer__root { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12px; }
+.mixer__scaleField { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+.mixer__scaleField select { min-height: 30px; padding: 0 6px; background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; }
+
+.mixer__title, .generator__title { margin: 0; font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.mixer__hint, .generator__hint { margin: 8px 0 12px; font-size: 12px; color: var(--muted); max-width: 62ch; }
 .mixer__faders { display: flex; gap: 10px; flex-wrap: wrap; }
 .fader { display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .fader__input { writing-mode: vertical-lr; direction: rtl; width: 28px; height: 110px; accent-color: var(--accent); }

@@ -51,7 +51,7 @@ export interface TrackState {
   /**
    * Semitone offset applied to pitches drawn from the mixer. ±12, ±24.
    *
-   * The pitch mixer is global — one set of twelve faders for the whole rack —
+   * The pitch mixer is global — one shared pool of notes for the whole rack —
    * so without a per-track offset every voice track would generate in the same
    * octave and the result would be mud. Register is the property that makes a
    * shared pitch source usable across eight tracks, and it is a real hardware

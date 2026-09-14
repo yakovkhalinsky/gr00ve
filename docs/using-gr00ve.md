@@ -45,9 +45,10 @@ notes instead of a drum, using the drum part's rhythm. Click it again to switch
 back. Nothing is lost either way.
 
 **4. Rewrite a track's pitches.** Move some faders in the **Pitch probability**
-panel — these are the twelve notes of the scale, one per semitone from the root.
-Pull one down to zero to remove that note from the pool entirely. Now click
-**E(4,16)** on Track 1 (the bass). Its notes are redrawn from your new weights.
+panel — one per note in the scale. Pull one to zero to remove that note from
+the pool entirely. Now click **E(4,16)** on Track 1 (the bass). Its notes are
+redrawn from your new weights. Change the **Scale** in that panel's header and
+watch the faders change with it — a pentatonic leaves five, a mode seven.
 
 **5. Change the rhythm.** At the bottom of the page, set **Pulses** to `5` and
 **Steps** to `8`. Click **E(5,8)** on Track 6. You've just written a Euclidean
@@ -77,20 +78,29 @@ so get it back with **E(4,16)**.
 
 ### Pitch probability
 
-Twelve faders, one per semitone above the root. Each sets **how likely that
-note is** to be chosen when a pattern is generated. Pull one to zero and the
-note is removed from the pool entirely — there's no separate on/off.
+**One fader per note in the scale.** Each sets how likely that note is to be
+chosen when a pattern is generated. Pull one to zero and the note is removed
+from the pool entirely — there's no separate on/off. The **scale selector sits
+in this panel's header**, because the scale is what decides which notes exist.
 
-This is the panel that decides *what* the generators play. **E(k,n)** decides
-*when*. Changing a fader does nothing until you generate, so nothing you've
-edited by hand gets overwritten underneath you.
+**Changing the scale changes how many faders there are** — five for a
+pentatonic, seven for a mode. That is the honest consequence of the scale
+defining the palette, not a quirk. The panel used to show a fixed twelve
+chromatic faders, which looked like twelve notes but only ever produced the
+scale's: with a minor pentatonic, the faders labelled A♯, C♯, F♯ and G♯ all
+collapsed onto their neighbours and summed their weights invisibly, so four of
+them did nothing you could see. Now every fader does something and its label is
+the note it actually plays.
+
+This panel decides *what* the generators play. **E(k,n)** decides *when*.
+Changing a fader does nothing until you generate, so nothing you've edited by
+hand gets overwritten underneath you.
 
 Two behaviours worth knowing:
 
-- **Notes are snapped into the scale.** A fader that lands between two scale
-  notes gives you the nearer one, so the twelve faders act as a pool rather than
-  a precise tuning. Weighted a fifth in a minor pentatonic, you'll get whatever
-  in-scale note is closest.
+- **Accidentals are shown only when the scale has them.** In Aeolian you get
+  B, C, E and F with no sharps; in Phrygian the second degree is a semitone, so
+  the fader is labelled A♯. The labels always name a real note you can get.
 - **The octave jump is rare by default.** The third octave is deliberately
   unused, because a wide range makes an electronic lead muddy rather than
   expressive.

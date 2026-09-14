@@ -2,10 +2,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  pitchMixer, pickPitch, pickPitchOnly, emptyMix, withWeight, DEFAULT_MIX, type PitchMix,
+  pitchMixer, pickPitch, pickPitchOnly, emptyMix, withWeight, mixSlots, withSlotWeight,
+  DEFAULT_MIX, type PitchMix,
 } from './pitch-mixer.ts';
 import { euclid } from './euclid.ts';
 import { makeRng } from './rng.ts';
+import { SCALES, SCALE_NAMES } from '../theory/scale.ts';
 
 const pitches = (m: PitchMix, steps: number, seed: number) =>
   pitchMixer(m, steps, makeRng(seed)).map((s) => (s === null ? null : s.pitch));
@@ -173,4 +175,119 @@ test('a gate shorter than the loop does not crash', () => {
   const cells = pitchMixer(DEFAULT_MIX, 8, makeRng(1), [true, true]);
   assert.equal(cells.length, 8);
   assert.equal(cells.filter((c) => c !== null).length, 2);
+});
+
+// --- the scale projection ---------------------------------------------------
+//
+// The chromatic model above is faithful to the hardware, but it lies in the UI:
+// under a pentatonic, twelve faders produce five distinct notes, and the ones
+// that collapse sum their weights invisibly. `mixSlots` is the honest view.
+
+test('one slot per scale note, in ascending pitch order', () => {
+  const slots = mixSlots(DEFAULT_MIX, 'minorPentatonic');
+  assert.deepEqual(slots.map((s) => s.offset), [0, 3, 5, 7, 10]);
+  const slots7 = mixSlots(DEFAULT_MIX, 'aeolian');
+  assert.deepEqual(slots7.map((s) => s.offset), [0, 2, 3, 5, 7, 8, 10]);
+});
+
+test('the slot count matches the scale, for every scale', () => {
+  for (const name of SCALE_NAMES) {
+    const slots = mixSlots(DEFAULT_MIX, name);
+    assert.equal(slots.length, SCALES[name].length, `${name} produced ${slots.length} slots`);
+  }
+});
+
+test('every chromatic slot is accounted for exactly once', () => {
+  // The projection must be a partition: a dropped semitone would be a fader
+  // whose weight goes nowhere, and a duplicated one would be double-counted.
+  for (const name of SCALE_NAMES) {
+    const seen = mixSlots(DEFAULT_MIX, name).flatMap((s) => s.sources);
+    assert.deepEqual([...seen].sort((a, b) => a - b), Array.from({ length: 12 }, (_, i) => i), name);
+  }
+});
+
+test('a slot always appears among its own sources', () => {
+  // This is what makes `withSlotWeight` well-defined: there is always a
+  // chromatic position to write the value to.
+  for (const name of SCALE_NAMES) {
+    for (const slot of mixSlots(DEFAULT_MIX, name)) {
+      assert.ok(slot.sources.includes(slot.offset), `${name}: offset ${slot.offset} not in its sources`);
+    }
+  }
+});
+
+test('a slot weight is the sum of the chromatic slots behind it', () => {
+  // A distinct weight per chromatic slot, so the sum is unambiguous.
+  const weights = Array.from({ length: 12 }, (_, i) => i + 1);
+  const slots = mixSlots({ ...DEFAULT_MIX, weights }, 'minorPentatonic');
+
+  for (const slot of slots) {
+    const expected = slot.sources.reduce((sum, s) => sum + (weights[s] ?? 0), 0);
+    assert.equal(slot.weight, expected, `offset ${slot.offset}`);
+  }
+
+  // And the collapse is real: twelve faders, five distinct notes.
+  assert.equal(slots.length, 5);
+  // The nearest-note rule puts A# with A and G# with G — note G#, not A, which
+  // is the easy thing to guess wrong.
+  assert.deepEqual(slots.find((s) => s.offset === 0)?.sources, [0, 1]);
+  assert.deepEqual(slots.find((s) => s.offset === 10)?.sources, [9, 10, 11]);
+});
+
+test('setting a slot weight zeroes the faders that collapsed onto it', () => {
+  // Otherwise a shadowed neighbour keeps contributing and the fader reads more
+  // than the value just set — the bug this projection exists to expose.
+  const weights = new Array<number>(12).fill(0);
+  weights[0] = 1;
+  weights[1] = 0.5; // A# also lands on A
+  const mix: PitchMix = { ...DEFAULT_MIX, weights };
+
+  const slot = mixSlots(mix, 'minorPentatonic').find((s) => s.offset === 0);
+  assert.ok(slot);
+  assert.equal(slot.weight, 1.5, 'setup: two faders should sum onto A');
+
+  const next = withSlotWeight(mix, slot, 2);
+
+  assert.equal(next.weights[0], 2);
+  assert.equal(next.weights[1], 0, 'the collapsed A# fader survived');
+  assert.equal(
+    mixSlots(next, 'minorPentatonic').find((s) => s.offset === 0)?.weight,
+    2,
+    'the slot should read back exactly what was set',
+  );
+});
+
+test('withSlotWeight is immutable', () => {
+  const mix = { ...DEFAULT_MIX, weights: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] };
+  const before = [...mix.weights];
+  const slot = mixSlots(mix, 'minorPentatonic')[0];
+  assert.ok(slot);
+  withSlotWeight(mix, slot, 3);
+  assert.deepEqual(mix.weights, before, 'the original mix was mutated');
+});
+
+test('a slot weight round-trips through set and read', () => {
+  for (const value of [0, 0.5, 2, 4]) {
+    const mix: PitchMix = { ...emptyMix(45), weights: new Array<number>(12).fill(0) };
+    for (const slot of mixSlots(mix, 'aeolian')) {
+      const next = withSlotWeight(mix, slot, value);
+      const readBack = mixSlots(next, 'aeolian').find((s) => s.offset === slot.offset);
+      assert.equal(readBack?.weight, value, `offset ${slot.offset} did not round-trip`);
+    }
+  }
+});
+
+test('slot weights never go negative', () => {
+  const mix = emptyMix(45);
+  const slot = mixSlots(mix, 'minorPentatonic')[0];
+  assert.ok(slot);
+  assert.equal(withSlotWeight(mix, slot, -5).weights[slot.offset], 0);
+});
+
+test('changing scale changes the slot set, which is the point', () => {
+  // The same weights, read against two scales, give different fader counts and
+  // different notes — so the labels must follow the scale, not the chroma.
+  const a = mixSlots(DEFAULT_MIX, 'minorPentatonic');
+  const b = mixSlots(DEFAULT_MIX, 'blues');
+  assert.notDeepEqual(a.map((s) => s.offset), b.map((s) => s.offset));
 });

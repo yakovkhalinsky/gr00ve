@@ -166,6 +166,72 @@ export function emptyMix(root = 45): PitchMix {
   };
 }
 
+/**
+ * One note the mixer can actually produce.
+ *
+ * The weights in `PitchMix` are chromatic — twelve slots, as on the hardware,
+ * because that is the model the meloDICER and SIG use. But generation snaps
+ * every pick into the scale, so under a pentatonic **twelve faders produce only
+ * five distinct notes**: the ones labelled A# and G# both land on A, C# lands
+ * on C, and the faders that "share" a note silently sum their weights.
+ *
+ * A `MixSlot` is the honest view: one entry per note the scale can yield, with
+ * the chromatic slots that feed it. Rendering these instead of the raw twelve
+ * means every fader does something distinct, its label is the note it actually
+ * produces, and nothing is invisible.
+ */
+export interface MixSlot {
+  /** Semitone offset from the mix root. Always a member of the scale. */
+  readonly offset: number;
+  /** Chromatic offsets whose nearest in-scale pitch is `offset`. */
+  readonly sources: readonly number[];
+  /** Combined weight of those sources. */
+  readonly weight: number;
+}
+
+/**
+ * Project the chromatic mixer onto the notes the scale actually produces.
+ *
+ * Ascending by pitch, so the faders read as a keyboard rather than as an
+ * arbitrary order — which is what the hardware's slider-as-keyboard layout is
+ * for.
+ */
+export function mixSlots(mix: PitchMix, scale: ScaleName): MixSlot[] {
+  const byOffset = new Map<number, number[]>();
+
+  for (let semitone = 0; semitone < 12; semitone++) {
+    const snapped = quantizeNearest(mix.root + semitone, mix.root, scale);
+    const offset = (((snapped - mix.root) % 12) + 12) % 12;
+    const sources = byOffset.get(offset);
+    if (sources) sources.push(semitone);
+    else byOffset.set(offset, [semitone]);
+  }
+
+  return [...byOffset.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([offset, sources]) => ({
+      offset,
+      sources,
+      weight: sources.reduce((sum, s) => sum + (mix.weights[s] ?? 0), 0),
+    }));
+}
+
+/**
+ * Set one slot's weight.
+ *
+ * Writes the value to the slot's own chromatic position — which is always among
+ * its sources, since a scale note snaps to itself — and zeroes the chromatic
+ * slots that merely collapsed onto it. That keeps the projection stable: drag a
+ * fader to 2 and it reads 2, rather than 2 plus whatever a shadowed neighbour
+ * was contributing.
+ */
+export function withSlotWeight(mix: PitchMix, slot: MixSlot, weight: number): PitchMix {
+  const weights = [...mix.weights];
+  for (const source of slot.sources) weights[source] = 0;
+  weights[slot.offset] = Math.max(0, weight);
+  return { ...mix, weights };
+}
+
 /** Set one semitone's weight, returning a new mix. */
 export function withWeight(mix: PitchMix, semitone: number, weight: number): PitchMix {
   const weights = [...mix.weights];

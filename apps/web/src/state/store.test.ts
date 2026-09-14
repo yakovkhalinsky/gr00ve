@@ -238,7 +238,7 @@ test('kind and drum are independent axes', () => {
 // --- the pitch mixer drives generation --------------------------------------
 //
 // Euclid owns "when", the mixer owns "what". These tests are the contract
-// between the twelve faders and the E button.
+// between the pitch faders and the E button.
 
 /** Only the root semitone has weight, so every pitch is predictable. */
 const ROOT_ONLY = { ...DEFAULT_MIX, restProbability: 0, octaves: [1], weights: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] };

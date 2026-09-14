@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 import {
-  DRUM_LABELS, DRUM_TYPES, SCALE_LABELS, SCALE_NAMES, noteName, withWeight,
+  DRUM_LABELS, DRUM_TYPES, SCALE_LABELS, SCALE_NAMES, mixSlots, noteName, withSlotWeight,
   type DrumType, type ScaleName,
 } from '@gr00ve/core';
 import { trackStep } from '@gr00ve/audio';
@@ -92,21 +92,6 @@ export function App(): React.JSX.Element {
         <Knob label="Swing" value={swing} min={0} max={0.9} step={1 / 90} onChange={setSwing}
           format={(v) => (v === 0 ? 'straight' : `${Math.round(v * 100)}%`)} />
 
-        <div className="transport__scale">
-          <label>
-            Scale
-            <select
-              value={scale}
-              onChange={(e) => useGr00ve.setState({ scale: e.target.value as ScaleName })}
-            >
-              {SCALE_NAMES.map((name) => (
-                <option key={name} value={name}>{SCALE_LABELS[name]}</option>
-              ))}
-            </select>
-          </label>
-          <span className="transport__root">{noteName(root)}</span>
-        </div>
-
         {/* The guide is its own page in this deployment, built from the same
           * markdown the repo holds. Base-aware, so it resolves at `/` in dev
           * and `/gr00ve/` on Pages. */}
@@ -118,32 +103,62 @@ export function App(): React.JSX.Element {
       <MidiPanel />
 
       <section className="mixer" aria-label="Pitch probability mixer">
-        <h2 className="mixer__title">Pitch probability</h2>
+        {/* The scale lives here rather than in the transport bar because it
+          * *is* this panel's subject: it decides which notes exist, and so how
+          * many faders there are and what they are labelled. */}
+        <div className="mixer__head">
+          <h2 className="mixer__title">Pitch probability</h2>
+          <div className="mixer__scale">
+            <span className="mixer__root" title="Root note — faders are labelled from here">
+              {noteName(root)}
+            </span>
+            <label className="mixer__scaleField">
+              Scale
+              <select
+                value={scale}
+                onChange={(e) => useGr00ve.setState({ scale: e.target.value as ScaleName })}
+              >
+                {SCALE_NAMES.map((name) => (
+                  <option key={name} value={name}>{SCALE_LABELS[name]}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </div>
+
         <p className="mixer__hint">
-          One fader per semitone — pull one down to remove that pitch from the
-          pool, no separate enable needed. This is the meloDICER / SIG model: it
-          decides <em>what</em> the generators play, while <strong>E(k,n)</strong>{' '}
+          One fader per note in the scale — pull one down to remove that note
+          from the pool. This is the meloDICER / SIG model: it decides{' '}
+          <em>what</em> the generators play, while <strong>E(k,n)</strong>{' '}
           decides <em>when</em>. Press a track&rsquo;s <strong>E</strong> button
           to apply the current weights — editing a pattern by hand won&rsquo;t
           overwrite itself, so nothing changes until you do.
         </p>
+
         <div className="mixer__faders">
-          {mix.weights.map((w, semitone) => (
-            <label key={semitone} className="fader">
+          {/* One fader per *resulting* note, not one per semitone. The weights
+            * underneath are still chromatic, but under a pentatonic twelve
+            * faders produce only five distinct notes — the rest collapse onto
+            * their neighbours and sum invisibly. Showing the projection means
+            * every fader does something, and its label is the note it actually
+            * plays. Switching scale therefore changes the fader count, which is
+            * the honest consequence of the scale defining the palette. */}
+          {mixSlots(mix, scale).map((slot) => (
+            <label key={slot.offset} className="fader">
               <input
                 className="fader__input"
                 type="range"
                 min={0}
                 max={4}
                 step={0.05}
-                value={w}
-                aria-label={`Weight for ${noteName(root + semitone)}`}
+                value={slot.weight}
+                aria-label={`Weight for ${noteName(root + slot.offset)}`}
                 onChange={(e) => {
-                  const next = withWeight(mix, semitone, Number(e.target.value));
+                  const next = withSlotWeight(mix, slot, Number(e.target.value));
                   useGr00ve.setState({ mix: next });
                 }}
               />
-              <span className="fader__label">{noteName(root + semitone)}</span>
+              <span className="fader__label">{noteName(root + slot.offset)}</span>
             </label>
           ))}
         </div>
