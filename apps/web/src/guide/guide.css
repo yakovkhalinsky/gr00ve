@@ -18,6 +18,7 @@
   --muted: #9a9aa8;
   --accent: #5b8cf5;
   --accent-hot: #e6603c;
+  --on: #3f6fd8;
   --measure: 68ch;
   color-scheme: dark;
 }
@@ -177,6 +178,142 @@ body.guide {
 .toc a { color: var(--text); text-decoration: none; font-size: 15px; }
 .toc a:hover { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
 @media (max-width: 640px) { .toc ul { columns: 1; } }
+
+/* --- rendered figures ----------------------------------------------------
+ *
+ * The guide explains controls in prose; these show them. Everything here
+ * mirrors `apps/web/src/styles.css` rather than sharing it — the app's
+ * stylesheet is built for a dense control surface and would restyle the whole
+ * document. The cost is that a palette change has to be mirrored here, which is
+ * why every colour is a token.
+ *
+ * Scoped under `.figs` so nothing leaks into the prose.
+ */
+
+.figs__lede { color: var(--muted); }
+
+.figs__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+  gap: 18px;
+  margin: 26px 0 8px;
+}
+
+.fig {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.fig__stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 132px;
+  padding: 22px 18px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+}
+
+.fig__caption { padding: 14px 18px 18px; }
+.fig__caption h3 { margin: 0 0 6px; font-size: 15px; }
+.fig__caption p { margin: 0; font-size: 14px; line-height: 1.55; color: var(--muted); }
+.fig__caption strong { color: var(--text); font-weight: 650; }
+
+.figs kbd {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8em;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 0.1em 0.36em;
+  color: var(--text);
+}
+
+/* Knob — mirrors Knob.tsx's SVG. */
+.fig-knob { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.fig-knob__track { fill: var(--panel-2); stroke: var(--line); stroke-width: 2; }
+.fig-knob__arc { fill: none; stroke: var(--accent); stroke-width: 3; stroke-linecap: round; }
+.fig-knob__pointer { stroke: var(--text); stroke-width: 3; stroke-linecap: round; }
+.fig-knob__labels { display: flex; flex-direction: column; align-items: center; }
+.fig-knob__label { font-size: 11px; color: var(--muted); }
+.fig-knob__value { font-size: 11px; }
+
+/* Pitch faders. */
+.fig-faders { display: flex; gap: 14px; align-items: flex-end; }
+.fig-fader { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.fig-fader__track {
+  position: relative;
+  display: block;
+  width: 10px;
+  height: 76px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+}
+.fig-fader__fill { position: absolute; left: 0; right: 0; bottom: 0; background: var(--accent); border-radius: 5px; }
+.fig-fader__note { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* Steps, in each state the grid can show. */
+.fig-steps { display: flex; gap: 7px; flex-wrap: wrap; justify-content: center; }
+.fig-step { display: flex; flex-direction: column; align-items: center; gap: 7px; }
+.fig-step__label { font-size: 10px; color: var(--muted); white-space: nowrap; }
+
+.figs .step {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+}
+.figs .step__note {
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+}
+.figs .step.is-on { background: var(--on); border-color: var(--on); }
+.figs .step.is-accent { background: var(--accent-hot); border-color: var(--accent-hot); }
+/* Dark on the accent orange: white measures ~3.4:1 there, below the 4.5:1
+ * small text needs. The app flips the same way. */
+.figs .step.is-accent .step__note { color: #1b0d07; }
+.figs .step.is-playing { outline: 2px solid var(--text); outline-offset: 1px; }
+.figs .step.is-outside { opacity: 0.3; }
+
+.fig-loop { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.fig-loop__caption { margin: 0; font-size: 11px; color: var(--muted); }
+
+/* Voice / rhythm mode. */
+.fig-modes { display: flex; gap: 10px; }
+.figs .track__kind {
+  min-height: 32px;
+  padding: 0 12px;
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 12px;
+  /* Static illustrations, not controls — the real ones are in the app. */
+  cursor: default;
+}
+.figs .track__kind[data-kind='rhythm'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }

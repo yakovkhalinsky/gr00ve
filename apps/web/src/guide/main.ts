@@ -5,6 +5,8 @@ import { marked } from 'marked';
 // musician reads and the markdown a developer reviews can never drift apart.
 import markdown from '../../../../docs/using-gr00ve.md?raw';
 
+import { buildFigures } from './figures.ts';
+
 import './guide.css';
 
 /** Where the repo lives, for links that only exist as files. */
@@ -37,6 +39,19 @@ function slug(text: string): string {
     .trim()
     .replace(/\s+/g, '-');
 }
+
+/**
+ * Insert the rendered figures just before the Reference section.
+ *
+ * That position is the point: after the prose has said what the thing is, and
+ * before the reference starts naming controls the reader has not seen. Placed
+ * before the table of contents is built, so the new heading appears in it.
+ */
+const reference = [...container.querySelectorAll('h2')]
+  .find((heading) => (heading.textContent ?? '').trim() === 'Reference');
+const figures = buildFigures();
+if (reference) container.insertBefore(figures, reference);
+else container.append(figures);
 
 /**
  * Build a table of contents from the second-level headings.

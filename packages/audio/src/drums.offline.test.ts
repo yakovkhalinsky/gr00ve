@@ -121,15 +121,42 @@ test('a drum ignores the pitch and glide it is passed', { skip }, async () => {
   // Both are part of the shared Instrument signature. A drum that changed
   // character with pitch would make a rhythm track's melodic data leak into its
   // sound, and switching kinds back and forth would be audible.
-  async function hit(freq: number): Promise<Float32Array> {
-    const ctx = new Offline!(1, Math.round(SR * 0.4), SR);
-    const drum = new DrumVoice(ctx as unknown as BaseAudioContext, ctx.destination, DRUM_DEFAULTS.clap);
-    drum.noteOn(0.05, freq, 0.3, false, true);
-    return (await ctx.startRendering()).getChannelData(0);
+  //
+  // Both hits go through ONE context so the noise buffer, the sample rate and
+  // every other per-context detail are shared. An earlier version rendered each
+  // hit in its own context and compared the buffers; that folded the renderer's
+  // own variance into the result and failed intermittently in CI — passing on a
+  // re-run of the identical commit. Same-context comparison tests the property
+  // more tightly and cannot be perturbed by anything outside it.
+  const WINDOW = 3000;
+  const ctx = new Offline!(1, Math.round(SR * 0.8), SR);
+  const drum = new DrumVoice(ctx as unknown as BaseAudioContext, ctx.destination, DRUM_DEFAULTS.clap);
+  drum.noteOn(0.05, 55, 0.3, false, false);
+  drum.noteOn(0.4, 880, 0.3, false, true);
+  const data = (await ctx.startRendering()).getChannelData(0);
+
+  // Assert there is something to compare first, so a render that comes back
+  // silent fails as "no audio" rather than as a 3000-element diff of zeros.
+  assert.ok(rms(data, 0.05, 0.2) > 0.001, 'the low-pitch hit produced no sound');
+  assert.ok(rms(data, 0.4, 0.55) > 0.001, 'the high-pitch hit produced no sound');
+
+  const win = (t: number): Float32Array =>
+    data.slice(Math.round(t * SR), Math.round(t * SR) + WINDOW);
+  const low = win(0.05);
+  const high = win(0.4);
+
+  // Compared with a tolerance, not bit-exactly, and that is not laxity — it is
+  // the correct assertion. Web Audio computes an exponential ramp from the
+  // *absolute* timestamp, so two identical envelopes scheduled at 0.05s and
+  // 0.4s do not round to the same floats. Demanding bit-equality was this
+  // test's original mistake: it failed intermittently in CI on an unchanged
+  // commit, and on inspection the two renders differ by at most ~7e-6 — about
+  // -66 dB, three orders of magnitude below anything audible.
+  let maxDiff = 0;
+  for (let i = 0; i < WINDOW; i++) {
+    maxDiff = Math.max(maxDiff, Math.abs((low[i] ?? 0) - (high[i] ?? 0)));
   }
-  const low = await hit(55);
-  const high = await hit(880);
-  assert.deepEqual(Array.from(low.slice(0, 3000)), Array.from(high.slice(0, 3000)));
+  assert.ok(maxDiff < 1e-4, `pitch changed the drum sound: max difference ${maxDiff}`);
 });
 
 test('release() silences a ringing drum', { skip }, async () => {
