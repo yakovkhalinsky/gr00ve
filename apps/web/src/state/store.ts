@@ -356,9 +356,14 @@ function hasActiveSteps(snapshot: Snapshot): boolean {
  * unrecorded edit. An empty outgoing state is skipped even then, for the reason
  * above.
  */
-function recordVersion(track: TrackState, next: Snapshot): { history: Snapshot[]; historyIndex: number } {
+function recordVersion(
+  track: TrackState,
+  next: Snapshot,
+): { history: readonly Snapshot[]; historyIndex: number } {
   const current = snapshotOf(track);
   if (!hasActiveSteps(next) && !hasActiveSteps(current)) {
+    // Hands back the existing array rather than a copy: this path changes
+    // nothing, and copying on every redundant Clear is pure waste.
     return { history: track.history, historyIndex: track.historyIndex };
   }
 
