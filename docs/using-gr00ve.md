@@ -113,7 +113,7 @@ Each of the eight rows is a track. Left to right:
 |---|---|
 | **Track name** | Highlights the row. Currently cosmetic. |
 | **Mute** | Silences the track. Turns orange when engaged. |
-| **Loop** | The track's loop length in steps, **independent** of the pattern. This is the polymeter control. |
+| **Loop** | The track's loop length in steps, from 1 up to the pattern's own length. This is the polymeter control. |
 | **Mode (Voice / Rhythm)** | Switches the track between pitched notes and one drum sound. Filled blue in Rhythm mode. |
 | **Drum** | Which drum. Greyed out on a Voice track — but it still shows what the track *would* play if you switched it. |
 | **E(k,n)** | Writes a Euclidean pattern into this track, using the Pulses and Steps from the generator panel at the bottom of the page. |
@@ -121,8 +121,17 @@ Each of the eight rows is a track. Left to right:
 | Step grid | See below. |
 
 **Loop length and pattern length are separate.** Lowering a track's Loop to 5
-doesn't delete any steps — it just reads the first five of them and repeats.
-Raise it again and the rest come back.
+doesn't delete any steps — it just reads the first five of them and repeats, and
+raising it brings the rest back.
+
+Cells beyond the loop are **dimmed**, because the playhead wraps at the loop
+length and never reaches them. They stay clickable, so a pattern can be edited
+before the loop is lengthened, but they will not sound as they stand.
+
+The knob stops at the pattern's length rather than going higher. A longer loop
+would read past the end of the grid, where there is nothing to play, so the tail
+of the loop would fall silent — which is not what "make the loop longer" ought
+to mean.
 
 ### The step grid
 

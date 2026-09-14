@@ -316,10 +316,21 @@ export const useGr00ve = create<Gr00veState>()(
       set({ tracks: next });
     },
 
+    /**
+     * Set a track's loop length.
+     *
+     * Ceiling is the pattern's own length, not an arbitrary maximum. A longer
+     * loop reads past the end of the grid, where the lookup finds nothing and
+     * the step resolves to a rest — so "make the loop longer" would silently
+     * turn the tail of the loop into dead air rather than playing anything.
+     * Capping at the grid makes that unreachable.
+     */
     setTrackLength: (trackIndex, length) => {
-      const tracks = get().tracks.map((t, i) =>
-        i === trackIndex ? { ...t, length: Math.max(1, Math.min(64, Math.round(length))) } : t,
-      );
+      const tracks = get().tracks.map((t, i) => {
+        if (i !== trackIndex) return t;
+        const max = Math.max(1, t.cells.length);
+        return { ...t, length: Math.max(1, Math.min(max, Math.round(length))) };
+      });
       set({ tracks });
     },
 

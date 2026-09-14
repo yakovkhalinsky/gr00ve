@@ -89,19 +89,46 @@ export function stepNoteText(pitch: number | null | undefined, showNotes: boolea
 }
 
 /**
+ * Whether a step falls outside its track's loop, and so never plays.
+ *
+ * The loop length sets how many cells the track cycles through. A cell beyond
+ * it is unreachable — the playhead never lands there because the step counter
+ * wraps at the loop length — so the grid dims these to make the loop boundary
+ * visible. Without it, a track looping over 5 of 16 cells looks identical to
+ * one looping over all 16, and the polymeter feature becomes hard to reason
+ * about.
+ *
+ * Clamped, so a loop length at or beyond the pattern dims nothing. The store
+ * also refuses to set a longer loop, but a component should not depend on that
+ * having happened.
+ */
+export function isOutsideLoop(index: number, loopLength: number, total: number): boolean {
+  if (total <= 0) return false;
+  const len = Math.max(1, Math.min(total, Math.floor(loopLength)));
+  return index >= len;
+}
+
+/**
  * The accessible name for a step.
  *
  * Carries position, state and — when one is shown — the note, so the grid is
  * navigable without sight. Screen-reader users get the same information the
- * label gives everyone else rather than a bare "on".
+ * visible label gives everyone else rather than a bare "on", including whether
+ * the step is outside the loop, which is otherwise conveyed only by dimming.
  */
 export function stepAriaLabel(
   trackName: string,
   index: number,
-  state: { readonly on: boolean; readonly accent: boolean; readonly note: string },
+  state: {
+    readonly on: boolean;
+    readonly accent: boolean;
+    readonly note: string;
+    readonly outside?: boolean | undefined;
+  },
 ): string {
   const status = state.on ? (state.accent ? 'accented' : 'on') : 'off';
   const parts = [`${trackName}, step ${index + 1}`, status];
   if (state.note) parts.push(state.note);
+  if (state.outside) parts.push('outside loop');
   return parts.join(', ');
 }

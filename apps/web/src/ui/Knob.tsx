@@ -56,24 +56,34 @@ export function Knob({
   const dragStart = useRef<{ y: number; value: number } | null>(null);
 
   const range = max - min;
-  const resolution = (step ?? 1 / 100) * range;
+  // A knob with nothing to choose between — a one-step loop, say — has range 0,
+  // and dividing by it would push NaN through quantise and into the store,
+  // where it would sit as a silently broken value. Guarded rather than assumed
+  // away, because the range is now derived from data (a pattern's length)
+  // rather than being a literal.
+  const resolution = (step ?? 1 / 100) * (range === 0 ? 1 : range);
 
   const clamp = useCallback((v: number) => Math.max(min, Math.min(max, v)), [min, max]);
 
   const commit = useCallback(
     (v: number) => {
-      onChange(clamp(v));
+      // Never emit NaN, whatever arrives.
+      onChange(clamp(Number.isFinite(v) ? v : min));
     },
-    [clamp, onChange],
+    [clamp, min, onChange],
   );
 
   const quantise = useCallback(
     (v: number) => {
+      if (range === 0) {
+        commit(min);
+        return;
+      }
       // Snap to the resolution so values stay stable and displayable.
       const snapped = Math.round((v - min) / resolution) * resolution + min;
       commit(snapped);
     },
-    [commit, min, resolution],
+    [commit, min, range, resolution],
   );
 
   const onPointerDown = useCallback(

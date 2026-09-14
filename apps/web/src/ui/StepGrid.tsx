@@ -1,7 +1,8 @@
 import type { StepGrid as Grid } from '@gr00ve/core';
 
 import {
-  STEPS_PER_ROW, describeLayout, isDownbeat, layoutRows, stepAriaLabel, stepNoteText,
+  STEPS_PER_ROW, describeLayout, isDownbeat, isOutsideLoop, layoutRows, stepAriaLabel,
+  stepNoteText,
 } from './stepLayout.ts';
 
 /**
@@ -45,6 +46,14 @@ export interface StepGridProps {
    * plays. See `stepNoteText`.
    */
   readonly showNotes?: boolean;
+  /**
+   * The track's loop length, in steps.
+   *
+   * Cells at or beyond it are dimmed, because the playhead wraps at the loop
+   * length and never reaches them. Defaults to the pattern's own length, which
+   * dims nothing.
+   */
+  readonly loopLength?: number;
 }
 
 export function StepGrid({
@@ -57,14 +66,17 @@ export function StepGrid({
   onSelect,
   perRow = STEPS_PER_ROW,
   showNotes = false,
+  loopLength,
 }: StepGridProps): React.JSX.Element {
   const rows = layoutRows(steps, perRow);
+  const loop = Math.max(1, Math.min(steps.length, Math.floor(loopLength ?? steps.length)));
+  const loopNote = loop < steps.length ? `, looping over the first ${loop}` : '';
 
   return (
     <div
       className={`steps${selected ? ' is-selected' : ''}`}
       role="grid"
-      aria-label={`${trackName}, ${describeLayout(steps.length, perRow)}`}
+      aria-label={`${trackName}, ${describeLayout(steps.length, perRow)}${loopNote}`}
       onPointerDown={onSelect}
     >
       {rows.map((row) => (
@@ -75,6 +87,7 @@ export function StepGrid({
             const accent = step?.accent === true;
             const playing = i === playhead;
             const note = stepNoteText(step?.pitch ?? null, showNotes);
+            const outside = isOutsideLoop(i, loop, steps.length);
             return (
               <button
                 key={i}
@@ -85,13 +98,14 @@ export function StepGrid({
                   on ? 'is-on' : '',
                   accent ? 'is-accent' : '',
                   playing ? 'is-playing' : '',
+                  outside ? 'is-outside' : '',
                 ].filter(Boolean).join(' ')}
                 // Absolute index, so downbeat marks stay on the beat no matter
                 // where the row wraps.
                 data-beat={isDownbeat(i) ? 'downbeat' : 'offbeat'}
                 // Marks the half-bar boundary, i.e. the row start.
                 data-row-start={col === 0 ? 'true' : undefined}
-                aria-label={stepAriaLabel(trackName, i, { on, accent, note })}
+                aria-label={stepAriaLabel(trackName, i, { on, accent, note, outside })}
                 aria-pressed={on}
                 data-track={trackIndex}
                 data-step={i}

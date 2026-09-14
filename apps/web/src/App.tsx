@@ -184,12 +184,15 @@ export function App(): React.JSX.Element {
               >
                 Mute
               </button>
+              {/* Range is the pattern's own length, not a fixed 32: a loop
+                * longer than the grid reads past the end and goes silent, so
+                * the ceiling is what the track actually contains. */}
               <Knob
                 label="Loop"
                 value={track.length}
                 min={1}
-                max={32}
-                step={1 / 31}
+                max={Math.max(1, track.cells.length)}
+                step={track.cells.length > 1 ? 1 / (track.cells.length - 1) : 1}
                 size={40}
                 onChange={(v) => setTrackLength(i, v)}
                 format={(v) => `${Math.round(v)}`}
@@ -271,6 +274,7 @@ export function App(): React.JSX.Element {
               // Only melodic tracks get note labels: a drum's cells carry
               // pitches but ignore them.
               showNotes={track.kind === 'voice'}
+              loopLength={track.length}
               onToggle={(step) => toggleStep(i, step)}
               onSelect={() => select(i)}
             />

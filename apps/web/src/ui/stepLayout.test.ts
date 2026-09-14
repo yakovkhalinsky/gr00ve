@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  STEPS_PER_ROW, describeLayout, isDownbeat, layoutRows, stepAriaLabel, stepNoteText,
+  STEPS_PER_ROW, describeLayout, isDownbeat, isOutsideLoop, layoutRows, stepAriaLabel,
+  stepNoteText,
 } from './stepLayout.ts';
 
 const seq = (n: number) => Array.from({ length: n }, (_, i) => i);
@@ -142,4 +143,51 @@ test('the accessible name omits the note when none is shown', () => {
   const label = stepAriaLabel('Track 5', 2, { on: true, accent: false, note: '' });
   assert.equal(label, 'Track 5, step 3, on');
   assert.ok(!label.endsWith(',') && !label.includes(', ,'), `trailing empty segment in "${label}"`);
+});
+
+// --- loop boundary ----------------------------------------------------------
+
+test('steps beyond the loop length are outside it', () => {
+  // The playhead wraps at the loop length, so index 5 of a 5-step loop is
+  // never reached — the counter goes 0..4 and back to 0.
+  assert.equal(isOutsideLoop(4, 5, 16), false);
+  assert.equal(isOutsideLoop(5, 5, 16), true);
+  assert.equal(isOutsideLoop(15, 5, 16), true);
+});
+
+test('a loop covering the whole pattern dims nothing', () => {
+  for (let i = 0; i < 16; i++) {
+    assert.equal(isOutsideLoop(i, 16, 16), false, `step ${i} should be inside`);
+  }
+});
+
+test('a loop longer than the pattern dims nothing rather than everything', () => {
+  // The store refuses to set one, but a component must not depend on that —
+  // and clamping the wrong way here would grey out the entire grid.
+  for (let i = 0; i < 16; i++) {
+    assert.equal(isOutsideLoop(i, 40, 16), false, `step ${i}`);
+  }
+});
+
+test('a degenerate loop length still leaves a playable step', () => {
+  // Zero or negative would otherwise dim everything including step 0.
+  assert.equal(isOutsideLoop(0, 0, 16), false);
+  assert.equal(isOutsideLoop(1, 0, 16), true);
+  assert.equal(isOutsideLoop(0, -5, 16), false);
+});
+
+test('an empty pattern has no outside steps', () => {
+  assert.equal(isOutsideLoop(0, 0, 0), false);
+});
+
+test('the accessible name says when a step is outside the loop', () => {
+  // Dimming conveys this to sighted users only; the label has to carry it too.
+  assert.equal(
+    stepAriaLabel('Track 1', 9, { on: true, accent: false, note: 'C4', outside: true }),
+    'Track 1, step 10, on, C4, outside loop',
+  );
+  assert.equal(
+    stepAriaLabel('Track 1', 3, { on: true, accent: false, note: 'C4', outside: false }),
+    'Track 1, step 4, on, C4',
+  );
 });

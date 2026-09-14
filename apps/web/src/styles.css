@@ -228,6 +228,15 @@ body {
 .step.is-playing { outline: 2px solid var(--text); outline-offset: 1px; }
 .step:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+/* Cells beyond the track's loop length. The playhead wraps at the loop, so
+ * these never sound — dimming the whole cell, rather than any one part of it,
+ * keeps the on/off and accent distinctions intact while reading as inactive.
+ *
+ * Still clickable, and the hover lifts them: a pattern can be edited before the
+ * loop is lengthened. The dimming is what stops that being a surprise. */
+.step.is-outside { opacity: 0.3; }
+.step.is-outside:hover { opacity: 0.55; }
+
 /* Placeholder keeping a short final row column-aligned. Occupies a step's
  * footprint without being a control or a gridcell. */
 .step--pad { display: block; visibility: hidden; }
