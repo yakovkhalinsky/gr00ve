@@ -115,9 +115,16 @@ body {
 
 .mixer { padding: 14px 18px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
 
-/* Title and scale share a row: the scale is this panel's subject, since it
- * decides which notes exist and therefore how many faders there are. */
-.mixer__head { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; justify-content: space-between; }
+/* Title and scale share a row, sitting together on the left: the scale is this
+ * panel's subject, since it decides which notes exist and therefore how many
+ * faders there are, so it reads as part of the heading rather than as a control
+ * parked at the far edge.
+ *
+ * `align-items: center` rather than `baseline` now that the row contains a
+ * form control. Baseline alignment takes its reference from the group's first
+ * text item, which leaves the 30px select hanging below the title's baseline —
+ * centring the two is steadier when one of them is a control rather than text. */
+.mixer__head { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
 .mixer__scale { display: flex; align-items: center; gap: 10px; }
 .mixer__root { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12px; }
 .mixer__scaleField { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
