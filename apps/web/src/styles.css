@@ -105,14 +105,32 @@ body {
 /* Generate and erase stacked as one column. */
 .track__gen { display: flex; flex-direction: column; gap: 4px; }
 
-/* Voice / rhythm mode, plus the drum picker when in rhythm mode. */
-.track__inst { display: flex; flex-direction: column; gap: 4px; }
-.track__kind { min-height: 32px; padding: 0 10px; background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; cursor: pointer; font-size: 12px; }
+/* Voice / rhythm mode, plus the drum picker.
+ *
+ * The column is deliberately fixed-size in BOTH axes, because either one
+ * shifting makes the whole strip twitch on every mode switch:
+ *
+ *   - Vertically: both rows are always present, so removing the picker can
+ *     never change the height. (The track head centres its children, so a
+ *     shorter column would move the mode button up.)
+ *   - Horizontally: the mode button's label changes between "Voice" and
+ *     "Rhythm", and "Rhythm" is the wider word. Left to size itself, the
+ *     column — and everything after it, including the step grid — would shift
+ *     sideways. A fixed min-width plus `width: 100%` children makes the label
+ *     unable to drive layout at all. */
+.track__inst { display: flex; flex-direction: column; gap: 4px; min-width: 5.5rem; }
+
+.track__kind { width: 100%; min-height: 32px; padding: 0 10px; background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; cursor: pointer; font-size: 12px; }
 /* Rhythm mode is filled, not merely outlined — the mode has to be readable at
  * a glance down a column of eight tracks, and per the research a control whose
  * current meaning is not visible is where multiplexed interfaces go wrong. */
 .track__kind[data-kind='rhythm'] { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
-.track__drum { min-height: 28px; padding: 0 6px; background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; font-size: 12px; }
+
+.track__drum { width: 100%; min-height: 28px; padding: 0 6px; background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; font-size: 12px; }
+/* Disabled rather than hidden on a voice track: keeps the row height fixed, and
+ * keeps the selected drum legible as the value the track would use. Dimmed
+ * enough to read as inactive, not so far as to look broken. */
+.track__drum:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* Clear is destructive and there is no undo yet, so it sits visually quieter
  * than the generate button — it should be findable, not inviting. */

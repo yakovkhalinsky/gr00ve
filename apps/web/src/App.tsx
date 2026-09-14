@@ -184,19 +184,29 @@ export function App(): React.JSX.Element {
                 >
                   {track.kind === 'rhythm' ? 'Rhythm' : 'Voice'}
                 </button>
-                {/* Only shown for rhythm tracks, so voice strips stay narrow. */}
-                {track.kind === 'rhythm' && (
-                  <select
-                    className="track__drum"
-                    value={track.drum}
-                    aria-label={`${track.name} drum sound`}
-                    onChange={(e) => setDrum(i, e.target.value as DrumType)}
-                  >
-                    {DRUM_TYPES.map((drum) => (
-                      <option key={drum} value={drum}>{DRUM_LABELS[drum]}</option>
-                    ))}
-                  </select>
-                )}
+                {/* Always rendered, merely disabled on a voice track.
+                  *
+                  * Removing it instead would change the column's height on
+                  * every mode switch, and because the track head centres its
+                  * children the mode button above would jump up and down. The
+                  * value is also worth seeing while inactive: it is what the
+                  * track will play if switched to rhythm, so greying it out
+                  * reads as "inactive" rather than "not applicable". */}
+                <select
+                  className="track__drum"
+                  value={track.drum}
+                  disabled={track.kind !== 'rhythm'}
+                  aria-label={
+                    track.kind === 'rhythm'
+                      ? `${track.name} drum sound`
+                      : `${track.name} drum sound, used only in rhythm mode`
+                  }
+                  onChange={(e) => setDrum(i, e.target.value as DrumType)}
+                >
+                  {DRUM_TYPES.map((drum) => (
+                    <option key={drum} value={drum}>{DRUM_LABELS[drum]}</option>
+                  ))}
+                </select>
               </div>
 
               {/* Euclid and Clear are stacked in one column so the
