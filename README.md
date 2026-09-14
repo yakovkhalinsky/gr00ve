@@ -16,21 +16,45 @@ in this repo come from it.
 > silently disable MIDI. (The domain's HTTPS enforcement is a setting on the
 > user-level Pages site, not this repo.)
 
-**Status: scaffold.** The generation core is real and tested. The audio engine
-and MIDI layers are skeletons with the hard parts researched and documented. The
-UI is functional but not wired to the scheduler.
+**Status: playable.** Press Play and it makes sound. The generation core and
+the audio engine are real and tested; MIDI input is implemented but not yet
+bound to the UI.
 
 ### What the demo does and doesn't do
 
-**Works:** toggling steps, dragging knobs (relative drag — no jump on grab),
+**Works:** **Play.** Eight tracks of Euclidean patterns that drift against each
+other (loop lengths 16/16/8/5/16/7/13/16, so they realign roughly every 455
+bars). Plus toggling steps, dragging knobs (relative drag — no jump on grab),
 Shift for fine adjust, arrow keys, double-click to type a value, switching
-scales, the per-track loop length, the 12-fader pitch mixer, and **E(k,n)** —
-click a track's `E(5,8)` button to write a Euclidean pattern into it.
+scales, per-track loop length, the 12-fader pitch mixer, and **E(k,n)** — click
+a track's `E(5,8)` button to write a Euclidean pattern into it.
 
-**Doesn't:** **Play does nothing.** There is no audio engine wired yet, so
-nothing is audible. Playback, MIDI input, and the control-surface LEDs are the
-remaining work; the transport, scheduler and SysEx layers exist and are tested,
-but the glue is not written. See §8 of the brief for exactly what is missing.
+**Doesn't:**
+
+- **No MIDI input yet.** The mapping semantics (encoder relative modes, fader
+  pickup) and the Launch Control XL 3 / APC mini mk2 SysEx are implemented and
+  tested in `@gr00ve/midi`, but nothing is bound to the UI.
+- **All eight tracks share one voice shape**, differentiated only by register
+  and filter. Per-track instrument design is a taste decision, and a
+  generator-per-track model is the next real step the brief argues for.
+- **Resonance-coupled accent is not modelled** — see the note in
+  `packages/audio/src/index.ts`. It is the highest-value next addition to the
+  voice.
+
+### How the audio works
+
+`SequencerEngine` owns one `AudioContext`, one 303-ish monophonic voice per
+track, and a lookahead scheduler (100ms window / 25ms interval). Two details are
+worth knowing before changing it:
+
+- **The engine is constructed inside the Play click's call stack.** Browsers
+  refuse to start an `AudioContext` outside a user gesture, and the failure is
+  *silent* — the context just stays suspended. Moving that into an effect breaks
+  audio with no error.
+- **The playhead is released on the audio clock, not at schedule time.** The
+  scheduler runs 100ms ahead, so notifying the UI when a step is *scheduled*
+  makes the highlight visibly lead the sound. Steps are queued with their
+  `AudioContext` times and released when the clock reaches them.
 
 ## Quick start
 
@@ -88,13 +112,34 @@ Two consequences that bite:
 
 ## Testing strategy
 
-Pure logic runs under `node --test` with no browser and no mocks — that is 104
-tests today and the bulk of what matters.
+Pure logic runs under `node --test` with no browser and no mocks — the bulk of
+what matters.
 
-Anything touching Web Audio or Web MIDI needs a real browser. The intended split
-is `OfflineAudioContext` under Vitest for DSP and scheduling maths (deterministic
-and headless), and Playwright for smoke tests. Note that headless Chromium still
-has no audio device, so assert on graph and scheduling *state*, not on sound.
+**The audio is actually rendered and measured**, rather than assumed.
+`node-web-audio-api` provides a real Web Audio implementation in Node, so
+`voice.offline.test.ts` renders the voice through an `OfflineAudioContext` and
+asserts on amplitude, brightness, and envelope continuity. That is what catches
+a voice that schedules silently — a failure invisible to type-checks, builds and
+green test runs.
+
+Two lessons from writing those tests, both of which cost real time:
+
+- **Zero-crossing rate cannot tell a gain change from a filter change.** A
+  sawtooth through a lowpass crosses zero at the same indices at any gain, so
+  ZCR reports them identically — which is exactly the distinction an accent test
+  must make. Use mean |Δsample| / RMS instead.
+- **An accent is a transient.** Its filter effect is short by design, so
+  averaging brightness over a whole note can make an accented note measure
+  *darker* than a plain one. Measure peak brightness in short windows.
+
+`node-web-audio-api` is an optional dev dependency: the offline tests skip
+cleanly if it is not installed, so `node --test` still works with nothing
+installed.
+
+Still uncovered: `engine.ts` and `scheduler.ts` construct their own
+`AudioContext` and use `requestAnimationFrame`, so they are not reachable from
+the offline harness. Their logic is covered via `timeline.ts` (pure, tested) and
+the rest is exercised by driving the app.
 
 ## Two things to know before touching the timing code
 

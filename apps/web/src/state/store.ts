@@ -42,9 +42,19 @@ export interface TrackState {
 
 export interface Gr00veState {
   readonly bpm: number;
+  /** Steps per beat. 4 = 16th notes, so a 16-step pattern is one bar of 4/4. */
+  readonly stepsPerBeat: number;
   readonly swing: number;
   readonly playing: boolean;
-  readonly playhead: number;
+  /**
+   * The transport's monotonic step counter, or -1 when stopped.
+   *
+   * Deliberately *not* called "playhead": with polymeter each track is at a
+   * different point in its own loop, so a single playhead index would be wrong
+   * for all but one track. Callers map this through `trackStep` per track to
+   * get a position within that track's grid.
+   */
+  readonly globalStep: number;
   readonly selected: number;
   readonly root: number;
   readonly scale: ScaleName;
@@ -54,7 +64,7 @@ export interface Gr00veState {
   setBpm: (bpm: number) => void;
   setSwing: (swing: number) => void;
   setPlaying: (playing: boolean) => void;
-  setPlayhead: (step: number) => void;
+  setGlobalStep: (step: number) => void;
   select: (index: number) => void;
   toggleStep: (trackIndex: number, step: number) => void;
   setTrackLength: (trackIndex: number, length: number) => void;
@@ -62,25 +72,47 @@ export interface Gr00veState {
   euclidize: (trackIndex: number, pulses: number, steps: number) => void;
 }
 
-function emptyTrack(index: number, scale: ScaleName, root: number): TrackState {
-  return {
-    id: `track-${index + 1}`,
-    name: `Track ${index + 1}`,
-    cells: new Array<Step | null>(DEFAULT_STEPS).fill(null),
-    length: DEFAULT_STEPS,
-    mute: false,
-    solo: false,
-    // Pitch chosen from the scale so a toggled step is never out of key.
-  };
-}
+/**
+ * Default content.
+ *
+ * The app ships *playing something* rather than an empty grid, for two reasons.
+ * An empty sequencer with a Play button gives no signal about whether playback
+ * works — the first click produces silence and reads as broken. And these
+ * particular patterns demonstrate the two features that are hardest to explain
+ * in prose: Euclidean rhythm, and polymeter.
+ *
+ * The loop lengths are deliberately coprime-ish (16, 16, 8, 5, 16, 7, 13, 16).
+ * lcm(16, 8, 5, 7, 13) = 7280 steps, so the eight tracks realign roughly every
+ * 455 bars — the pattern evolves instead of looping, from 8 stored rows.
+ */
+const SEED: readonly { pulses: number; steps: number; degree: number }[] = [
+  { pulses: 4, steps: 16, degree: -7 }, // root down an octave: the bass
+  { pulses: 5, steps: 16, degree: 0 },
+  { pulses: 3, steps: 8, degree: 2 },
+  { pulses: 2, steps: 5, degree: 4 },
+  { pulses: 7, steps: 16, degree: 5 },
+  { pulses: 3, steps: 7, degree: 7 },
+  { pulses: 5, steps: 13, degree: 9 },
+  { pulses: 6, steps: 16, degree: 12 },
+];
 
 /** Build a grid from a Euclidean mask — the rhythmic spine of a track. */
-export function euclidCells(pulses: number, steps: number, root: number, scale: ScaleName, rotation = 0): Cells {
+export function euclidCells(
+  pulses: number,
+  steps: number,
+  root: number,
+  scale: ScaleName,
+  opts: { rotation?: number; baseDegree?: number } = {},
+): Cells {
+  const rotation = opts.rotation ?? 0;
+  const baseDegree = opts.baseDegree ?? 0;
   const mask = euclid(pulses, steps, rotation);
   return mask.map((on, i) =>
     on
       ? ({
-          pitch: degreeToPitch(root, scale, i % 5),
+          // Onsets walk up the scale so a Euclidean mask reads as a melodic
+          // figure rather than one repeated note.
+          pitch: degreeToPitch(root, scale, baseDegree + (i % 5)),
           velocity: 0.75,
           accent: i % 4 === 0,
           slide: false,
@@ -90,22 +122,37 @@ export function euclidCells(pulses: number, steps: number, root: number, scale: 
   );
 }
 
+function seedTrack(index: number, root: number, scale: ScaleName): TrackState {
+  const pattern = SEED[index % SEED.length] ?? { pulses: 4, steps: 16, degree: 0 };
+  return {
+    id: `track-${index + 1}`,
+    name: `Track ${index + 1}`,
+    cells: euclidCells(pattern.pulses, pattern.steps, root, scale, { baseDegree: pattern.degree }),
+    // Loop length matches the generated grid, and stays independent of it —
+    // editing the length later must not rewrite the pattern.
+    length: pattern.steps,
+    mute: false,
+    solo: false,
+  };
+}
+
 export const useGr00ve = create<Gr00veState>()(
   subscribeWithSelector((set, get) => ({
     bpm: 128,
+    stepsPerBeat: 4,
     swing: 0,
     playing: false,
-    playhead: -1,
+    globalStep: -1,
     selected: 0,
     root: 45,
     scale: 'minorPentatonic',
     mix: DEFAULT_MIX,
-    tracks: Array.from({ length: TRACK_COUNT }, (_, i) => emptyTrack(i, 'minorPentatonic', 45)),
+    tracks: Array.from({ length: TRACK_COUNT }, (_, i) => seedTrack(i, 45, 'minorPentatonic')),
 
     setBpm: (bpm) => set({ bpm: Math.max(20, Math.min(300, bpm)) }),
     setSwing: (swing) => set({ swing: Math.max(0, Math.min(0.9, swing)) }),
     setPlaying: (playing) => set({ playing }),
-    setPlayhead: (playhead) => set({ playhead }),
+    setGlobalStep: (globalStep) => set({ globalStep }),
     select: (selected) => set({ selected }),
 
     toggleStep: (trackIndex, step) => {

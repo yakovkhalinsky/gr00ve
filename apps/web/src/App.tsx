@@ -1,9 +1,28 @@
 import { useState } from 'react';
 
 import { SCALE_LABELS, SCALE_NAMES, noteName, withWeight, type ScaleName } from '@gr00ve/core';
-import { useGr00ve } from './state/store.ts';
+import { trackStep } from '@gr00ve/audio';
+import { useGr00ve, type TrackState } from './state/store.ts';
+import { useEngine } from './audio/useEngine.ts';
 import { Knob } from './ui/Knob.tsx';
 import { StepGrid } from './ui/StepGrid.tsx';
+
+/**
+ * Where a track currently is *within its own loop*.
+ *
+ * Deliberately not the transport's global step. With polymeter every track has
+ * its own loop length, so one global index maps to a different position per
+ * track — which is why the eight highlights visibly drift apart as a pattern
+ * plays, and why a single shared "playhead" would be wrong for all but one
+ * track. `length` alone determines this; the step grid is read-only here.
+ */
+function trackPlayhead(track: TrackState, globalStep: number): number {
+  if (globalStep < 0) return -1;
+  return trackStep(
+    { id: track.id, name: track.name, grid: track.cells, length: track.length },
+    globalStep,
+  );
+}
 
 /**
  * The rack.
@@ -26,16 +45,16 @@ export function App(): React.JSX.Element {
   const bpm = useGr00ve((s) => s.bpm);
   const swing = useGr00ve((s) => s.swing);
   const playing = useGr00ve((s) => s.playing);
-  const playhead = useGr00ve((s) => s.playhead);
+  const globalStep = useGr00ve((s) => s.globalStep);
   const tracks = useGr00ve((s) => s.tracks);
   const selected = useGr00ve((s) => s.selected);
   const mix = useGr00ve((s) => s.mix);
   const scale = useGr00ve((s) => s.scale);
   const root = useGr00ve((s) => s.root);
 
+  const { toggle } = useEngine();
   const setBpm = useGr00ve((s) => s.setBpm);
   const setSwing = useGr00ve((s) => s.setSwing);
-  const setPlaying = useGr00ve((s) => s.setPlaying);
   const select = useGr00ve((s) => s.select);
   const toggleStep = useGr00ve((s) => s.toggleStep);
   const setTrackLength = useGr00ve((s) => s.setTrackLength);
@@ -53,7 +72,10 @@ export function App(): React.JSX.Element {
           type="button"
           className="transport__play"
           aria-pressed={playing}
-          onClick={() => setPlaying(!playing)}
+          // `toggle` constructs the AudioContext inside this click's call stack.
+          // Browsers refuse to start audio outside a user gesture, and the
+          // failure is silent, so this cannot be moved into an effect.
+          onClick={toggle}
         >
           {playing ? 'Stop' : 'Play'}
         </button>
@@ -149,7 +171,7 @@ export function App(): React.JSX.Element {
               trackName={track.name}
               trackIndex={i}
               steps={track.cells}
-              playhead={i === selected ? playhead : -1}
+              playhead={trackPlayhead(track, globalStep)}
               selected={i === selected}
               onToggle={(step) => toggleStep(i, step)}
               onSelect={() => select(i)}
@@ -170,13 +192,19 @@ export function App(): React.JSX.Element {
           onChange={(v) => setSteps(Math.round(v))} format={(v) => `${Math.round(v)}`} />
       </section>
 
-      {/* TODO: wire the Scheduler + Web MIDI. The pieces exist and are tested:
-       *   @gr00ve/audio  Scheduler (lookahead), Transport (swing, polymeter)
-       *   @gr00ve/midi   learn.ts (encoder modes, fader pickup), lcxl3 SysEx
-       * What is missing is the glue: an AudioContext, voice allocation, and the
-       * subscribeTransient path from this store into the scheduler. Kept out of
-       * the scaffold because voice design is a taste decision, not a research
-       * finding — see docs/research-brief.md. */}
+      {/* Playback is wired: @gr00ve/audio's SequencerEngine owns the
+       * AudioContext, one 303-ish monophonic voice per track, and a lookahead
+       * scheduler. See apps/web/src/audio/useEngine.ts.
+       *
+       * Still missing:
+       *   - Web MIDI in. The mapping semantics (encoder relative modes, fader
+       *     pickup) and the Launch Control XL 3 / APC mini mk2 SysEx are
+       *     implemented and tested in @gr00ve/midi, but nothing is bound yet.
+       *   - Per-track instrument selection. All eight tracks share one voice
+       *     shape, differentiated only by register and filter (see
+       *     `trackVoice`). A generator-per-track model is the next real step —
+       *     the brief argues "melody generation" means something different in
+       *     each genre, so the generator should be a per-track choice. */}
     </main>
   );
 }
