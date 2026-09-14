@@ -1,6 +1,8 @@
 import type { StepGrid as Grid } from '@gr00ve/core';
 
-import { STEPS_PER_ROW, describeLayout, isDownbeat, layoutRows } from './stepLayout.ts';
+import {
+  STEPS_PER_ROW, describeLayout, isDownbeat, layoutRows, stepAriaLabel, stepNoteText,
+} from './stepLayout.ts';
 
 /**
  * The per-track step editor.
@@ -35,6 +37,14 @@ export interface StepGridProps {
   readonly onSelect?: () => void;
   /** Override the wrap width. */
   readonly perRow?: number;
+  /**
+   * Show each step's note name inside it.
+   *
+   * On for voice tracks, off for rhythm tracks — a drum ignores the pitch in
+   * its cells, so labelling a kick "C3" would assert something false about what
+   * plays. See `stepNoteText`.
+   */
+  readonly showNotes?: boolean;
 }
 
 export function StepGrid({
@@ -46,6 +56,7 @@ export function StepGrid({
   onToggle,
   onSelect,
   perRow = STEPS_PER_ROW,
+  showNotes = false,
 }: StepGridProps): React.JSX.Element {
   const rows = layoutRows(steps, perRow);
 
@@ -63,6 +74,7 @@ export function StepGrid({
             const on = step !== null;
             const accent = step?.accent === true;
             const playing = i === playhead;
+            const note = stepNoteText(step?.pitch ?? null, showNotes);
             return (
               <button
                 key={i}
@@ -79,12 +91,14 @@ export function StepGrid({
                 data-beat={isDownbeat(i) ? 'downbeat' : 'offbeat'}
                 // Marks the half-bar boundary, i.e. the row start.
                 data-row-start={col === 0 ? 'true' : undefined}
-                aria-label={`${trackName}, step ${i + 1}, ${on ? (accent ? 'accented' : 'on') : 'off'}`}
+                aria-label={stepAriaLabel(trackName, i, { on, accent, note })}
                 aria-pressed={on}
                 data-track={trackIndex}
                 data-step={i}
                 onClick={() => onToggle(i)}
-              />
+              >
+                {note ? <span className="step__note">{note}</span> : null}
+              </button>
             );
           })}
           {/* Spacers are aria-hidden: an empty gridcell is just noise to a

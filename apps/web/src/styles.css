@@ -192,7 +192,29 @@ body {
   border: 1px solid var(--line);
   border-radius: 5px;
   cursor: pointer;
+  /* Centres the note label when one is shown; harmless when it isn't. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
+
+/* Note name inside a step. Small, but the cells are 44px and a label is at
+ * most three characters ("C#3", "G9", "C-1"), so there is room to keep it at a
+ * readable size rather than shrinking it to fit. */
+.step__note {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  pointer-events: none;
+}
+
+/* White on the accent orange measures about 3.4:1 — below the 4.5:1 that small
+ * text needs. Dark text on the same fill is about 6:1, so accents flip rather
+ * than sharing one colour and failing quietly. */
+.step.is-accent .step__note { color: #1b0d07; }
 
 /* A quiet downbeat every 4 steps — readability without counting. */
 .step[data-beat='downbeat'] { border-color: #3d3d4c; }

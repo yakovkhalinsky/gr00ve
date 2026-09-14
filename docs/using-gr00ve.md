@@ -136,6 +136,12 @@ step 9 is step 9, not "row 2, step 1".
   own loop length. That's why they drift apart.
 - The first cell of each row has a brighter left edge marking the half-bar, and
   every fourth step is subtly marked as a downbeat.
+- **Melodic steps are labelled with their note** — `C4`, `A#3`. The octave is
+  part of the label because the mixer's occasional octave jump means two steps
+  with the same note name can sit an octave apart, which is invisible without
+  it. **Rhythm tracks show no labels**: a drum ignores the pitch stored in its
+  cells, so labelling a kick step `C3` would claim something untrue. The drum's
+  name in the picker above is what identifies it.
 
 Hand-placed steps are **unaccented**. Only generated patterns accent their
 downbeats — so if you want accents, generate, then edit around them.

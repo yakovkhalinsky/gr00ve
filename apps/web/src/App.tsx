@@ -268,6 +268,9 @@ export function App(): React.JSX.Element {
               steps={track.cells}
               playhead={trackPlayhead(track, globalStep)}
               selected={i === selected}
+              // Only melodic tracks get note labels: a drum's cells carry
+              // pitches but ignore them.
+              showNotes={track.kind === 'voice'}
               onToggle={(step) => toggleStep(i, step)}
               onSelect={() => select(i)}
             />

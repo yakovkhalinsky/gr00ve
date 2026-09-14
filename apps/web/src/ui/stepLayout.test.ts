@@ -1,7 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { STEPS_PER_ROW, layoutRows, isDownbeat, describeLayout } from './stepLayout.ts';
+import {
+  STEPS_PER_ROW, describeLayout, isDownbeat, layoutRows, stepAriaLabel, stepNoteText,
+} from './stepLayout.ts';
 
 const seq = (n: number) => Array.from({ length: n }, (_, i) => i);
 
@@ -82,4 +84,62 @@ test('describeLayout reads as a sentence for the accessible name', () => {
   assert.equal(describeLayout(16), '16 steps in 2 rows of 8');
   assert.equal(describeLayout(8), '8 steps in 1 row of 8');
   assert.equal(describeLayout(12), '12 steps in 2 rows of 8');
+});
+
+// --- step labels ------------------------------------------------------------
+
+test('a voice step shows its note name, with the octave', () => {
+  assert.equal(stepNoteText(60, true), 'C4');
+  assert.equal(stepNoteText(57, true), 'A3');
+  assert.equal(stepNoteText(61, true), 'C#4');
+});
+
+test('the octave is part of the label, which is the point', () => {
+  // The mixer's octave weight means two steps of the same pitch class can sit
+  // an octave apart. Without the octave that is invisible in the grid.
+  assert.notEqual(stepNoteText(60, true), stepNoteText(72, true));
+});
+
+test('a rest shows nothing', () => {
+  assert.equal(stepNoteText(null, true), '');
+  assert.equal(stepNoteText(undefined, true), '');
+});
+
+test('a rhythm track shows nothing even though its cells hold pitches', () => {
+  // Drum cells keep their pitches so switching back to a voice restores the
+  // melody, but the drum ignores them — labelling a kick "C4" would assert
+  // something false about what is played.
+  assert.equal(stepNoteText(60, false), '');
+  assert.equal(stepNoteText(38, false), '');
+});
+
+test('an extreme pitch still renders as a short label', () => {
+  // The cells are 44px, so a label must stay within about three characters.
+  for (const pitch of [0, 127, 21, 108]) {
+    const label = stepNoteText(pitch, true);
+    assert.ok(label.length > 0 && label.length <= 3, `${pitch} gave "${label}"`);
+  }
+});
+
+test('the accessible name carries position, state and note', () => {
+  assert.equal(
+    stepAriaLabel('Track 1', 4, { on: true, accent: false, note: 'C4' }),
+    'Track 1, step 5, on, C4',
+  );
+  assert.equal(
+    stepAriaLabel('Track 1', 0, { on: true, accent: true, note: 'A3' }),
+    'Track 1, step 1, accented, A3',
+  );
+  assert.equal(
+    stepAriaLabel('Track 1', 9, { on: false, accent: false, note: '' }),
+    'Track 1, step 10, off',
+  );
+});
+
+test('the accessible name omits the note when none is shown', () => {
+  // A trailing empty segment is announced as a pause, and on a rhythm track
+  // there is no note to announce in the first place.
+  const label = stepAriaLabel('Track 5', 2, { on: true, accent: false, note: '' });
+  assert.equal(label, 'Track 5, step 3, on');
+  assert.ok(!label.endsWith(',') && !label.includes(', ,'), `trailing empty segment in "${label}"`);
 });

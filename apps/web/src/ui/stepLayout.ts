@@ -8,6 +8,8 @@
  * asserting, because getting it wrong silently renumbers steps.
  */
 
+import { noteName } from '@gr00ve/core';
+
 /**
  * Steps per visual row.
  *
@@ -62,4 +64,44 @@ export function describeLayout(total: number, perRow: number = STEPS_PER_ROW): s
   const rows = Math.ceil(total / Math.max(1, perRow));
   const rowWord = rows === 1 ? 'row' : 'rows';
   return `${total} steps in ${rows} ${rowWord} of ${perRow}`;
+}
+
+/**
+ * The note text shown inside a step, or `''` for nothing.
+ *
+ * Two cases produce nothing, and both matter:
+ *
+ *   - **Rests.** A rest has no pitch, and a stale label from a cleared step
+ *     would be worse than blank.
+ *   - **Rhythm tracks.** A drum track carries pitches in its cells — they are
+ *     preserved so switching the track back to a voice restores the melody —
+ *     but the drum ignores them. Labeling a kick step "C3" would assert
+ *     something false about what plays, so rhythm grids stay unlabelled. The
+ *     drum it plays is already named in the picker above.
+ *
+ * Note names include the octave, which is the point: the mixer's octave weight
+ * means two steps of the same pitch class can sit an octave apart, and that is
+ * invisible without it.
+ */
+export function stepNoteText(pitch: number | null | undefined, showNotes: boolean): string {
+  if (!showNotes || pitch === null || pitch === undefined) return '';
+  return noteName(pitch);
+}
+
+/**
+ * The accessible name for a step.
+ *
+ * Carries position, state and — when one is shown — the note, so the grid is
+ * navigable without sight. Screen-reader users get the same information the
+ * label gives everyone else rather than a bare "on".
+ */
+export function stepAriaLabel(
+  trackName: string,
+  index: number,
+  state: { readonly on: boolean; readonly accent: boolean; readonly note: string },
+): string {
+  const status = state.on ? (state.accent ? 'accented' : 'on') : 'off';
+  const parts = [`${trackName}, step ${index + 1}`, status];
+  if (state.note) parts.push(state.note);
+  return parts.join(', ');
 }
