@@ -51,9 +51,28 @@ export interface PitchMix {
 
 export const DEFAULT_MIX: PitchMix = {
   root: 45, // A2
-  // Root, flat third, fifth, flat seventh weighted heavily; the rest sparse.
+  // Root, flat third, fifth and flat seventh weighted heavily; the rest sparse.
+  // Chromatic slots, as on the hardware — the scale below snaps them, so
+  // weighted semitones that fall between scale notes land on the nearest one
+  // rather than being discarded.
   weights: [1, 0, 0.5, 1, 0, 0.35, 0, 1, 0, 0.5, 0, 0.2],
-  octaves: [1, 0.35, 0.08],
+  /**
+   * Mostly the root octave, with the one above as an occasional accent — and
+   * deliberately *no* third octave.
+   *
+   * The genre research is unambiguous that an electronic melody occupies about
+   * 1–1.5 octaves, and that this is placement rather than poverty: the lead sits
+   * in a spectral pocket between the bass and the cymbal wash, so a wider range
+   * does not buy expression, it buys mud. A third octave weight here put G5 in
+   * the same bar as C3 — a 2.5-octave leap inside one line — which is exactly
+   * what that constraint exists to prevent.
+   *
+   * Note the span is set by the weights, not enforced by the generator: it is
+   * 10 semitones across the weighted semitones, plus 12 whenever the octave
+   * lands. That is the mixer doing its job — the performer owns the range — so
+   * the default just has to be a sensible starting point rather than a bound.
+   */
+  octaves: [1, 0.12],
   restProbability: 0.3,
   scale: 'minorPentatonic',
   accentProbability: 0.25,
@@ -61,9 +80,15 @@ export const DEFAULT_MIX: PitchMix = {
   gate: 0.58,
 };
 
-/** One pitch from the mix, or `null` for a rest. */
-export function pickPitch(mix: PitchMix, rng: Rng): number | null {
-  if (chance(rng, mix.restProbability)) return null;
+/**
+ * One pitch from the mix, ignoring the rest probability.
+ *
+ * Split out of `pickPitch` because these are two different decisions, and the
+ * composition path needs them apart: when a rhythm gate is supplied, *it* owns
+ * whether a step sounds, and a second rest roll on top would punch holes in a
+ * Euclidean pattern the performer deliberately dialled in.
+ */
+export function pickPitchOnly(mix: PitchMix, rng: Rng): number {
   const pc = weightedIndex(rng, mix.weights);
   const oct = weightedIndex(rng, mix.octaves);
   let pitch = mix.root + pc + 12 * oct;
@@ -71,10 +96,50 @@ export function pickPitch(mix: PitchMix, rng: Rng): number | null {
   return Math.max(0, Math.min(127, pitch));
 }
 
-/** Fill a loop of `steps` from the mix. */
-export function pitchMixer(mix: PitchMix, steps: number, rng: Rng): StepGrid {
+/** One pitch from the mix, or `null` for a rest. */
+export function pickPitch(mix: PitchMix, rng: Rng): number | null {
+  if (chance(rng, mix.restProbability)) return null;
+  return pickPitchOnly(mix, rng);
+}
+
+/**
+ * Fill a loop of `steps` from the mix.
+ *
+ * @param gate Optional rhythm, e.g. a Euclidean mask. **When supplied it owns
+ *   *when* a step sounds** — `restProbability` is ignored, and accent follows
+ *   the metre (every fourth step) rather than the mix's accent probability,
+ *   because accent placement is part of a rhythm rather than part of a pitch
+ *   choice. The mix still owns *what* sounds: which pitch, and each note's
+ *   gate length and slide.
+ *
+ *   This is how the two generators compose. Euclidean answers "when", the
+ *   pitch-probability mixer answers "what", and neither tries to do the
+ *   other's job — which is what lets the faders mean something without
+ *   overriding the rhythm the performer dialled in.
+ */
+export function pitchMixer(
+  mix: PitchMix,
+  steps: number,
+  rng: Rng,
+  gate?: readonly boolean[] | undefined,
+): StepGrid {
   const out: (Step | null)[] = [];
   for (let i = 0; i < steps; i++) {
+    if (gate !== undefined) {
+      if (gate[i] !== true) {
+        out.push(null);
+        continue;
+      }
+      out.push({
+        ...DEFAULT_STEP,
+        pitch: pickPitchOnly(mix, rng),
+        gate: mix.gate ?? DEFAULT_STEP.gate,
+        accent: i % 4 === 0,
+        slide: chance(rng, mix.slideProbability ?? 0),
+      });
+      continue;
+    }
+
     const pitch = pickPitch(mix, rng);
     if (pitch === null) {
       out.push(null);

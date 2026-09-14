@@ -110,8 +110,12 @@ export function App(): React.JSX.Element {
       <section className="mixer" aria-label="Pitch probability mixer">
         <h2 className="mixer__title">Pitch probability</h2>
         <p className="mixer__hint">
-          One fader per semitone. Pull one down to remove that pitch from the pool —
-          no separate enable needed. This is the meloDICER / SIG model.
+          One fader per semitone — pull one down to remove that pitch from the
+          pool, no separate enable needed. This is the meloDICER / SIG model: it
+          decides <em>what</em> the generators play, while <strong>E(k,n)</strong>{' '}
+          decides <em>when</em>. Press a track&rsquo;s <strong>E</strong> button
+          to apply the current weights — editing a pattern by hand won&rsquo;t
+          overwrite itself, so nothing changes until you do.
         </p>
         <div className="mixer__faders">
           {mix.weights.map((w, semitone) => (

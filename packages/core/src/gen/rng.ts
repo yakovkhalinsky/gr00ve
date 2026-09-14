@@ -30,6 +30,35 @@ export function randInt(rng: Rng, n: number): number {
   return Math.floor(rng() * n);
 }
 
+/**
+ * Derive a stable seed from several small integers.
+ *
+ * Used to make regeneration idempotent: seeding from the *parameters* of a
+ * generate action means clicking E(5,8) twice produces the same phrase rather
+ * than a fresh roll, while changing a pitch fader still changes the output —
+ * the random stream is identical, but a weighted choice against different
+ * weights lands somewhere else.
+ *
+ * That gives "evolve rather than re-roll" without a seed knob to manage. When
+ * deliberate variation is wanted, a seed control that the performer can turn is
+ * the researched next step (Marbles' DEJA VU, the Turing Machine's mutation
+ * probability).
+ *
+ * FNV-1a over the byte-expanded inputs — cheap, and well spread for small
+ * tuples, which is all this is ever asked to do.
+ */
+export function combineSeed(...parts: readonly number[]): number {
+  let hash = 0x811c9dc5;
+  for (const part of parts) {
+    // Four bytes per part, so order matters and (1, 2) differs from (2, 1).
+    for (let shift = 0; shift < 32; shift += 8) {
+      hash ^= (part >>> shift) & 0xff;
+      hash = Math.imul(hash, 0x01000193) >>> 0;
+    }
+  }
+  return hash >>> 0;
+}
+
 /** Float in [lo, hi). */
 export function randRange(rng: Rng, lo: number, hi: number): number {
   return lo + rng() * (hi - lo);

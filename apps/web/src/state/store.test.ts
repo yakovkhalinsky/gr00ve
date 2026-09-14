@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { DEFAULT_MIX, inScale } from '@gr00ve/core';
 import { euclidCells, useGr00ve } from './store.ts';
 
 /**
@@ -232,4 +233,140 @@ test('kind and drum are independent axes', () => {
   s().setTrackKind(7, 'rhythm');
   assert.equal(s().tracks[7]?.kind, 'rhythm');
   assert.equal(s().tracks[7]?.drum, 'snare');
+});
+
+// --- the pitch mixer drives generation --------------------------------------
+//
+// Euclid owns "when", the mixer owns "what". These tests are the contract
+// between the twelve faders and the E button.
+
+/** Only the root semitone has weight, so every pitch is predictable. */
+const ROOT_ONLY = { ...DEFAULT_MIX, restProbability: 0, octaves: [1], weights: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] };
+/**
+ * The root, one octave up — reached through the *octave* weights rather than by
+ * weighting a semitone a fifth above.
+ *
+ * That distinction matters: the generator snaps every pitch into the scale, so a
+ * weighted semitone lands on the nearest in-scale note rather than exactly where
+ * the fader points. An octave is always in scale, so it survives the snap
+ * untouched and the assertion can be exact.
+ */
+const OCTAVE_ONLY = { ...DEFAULT_MIX, restProbability: 0, weights: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], octaves: [0, 1] };
+
+function pitchesOf(index: number): (number | null)[] {
+  return s().tracks[index]?.cells.map((c) => (c === null ? null : c.pitch)) ?? [];
+}
+
+test('euclidize takes its pitches from the mixer', () => {
+  useGr00ve.setState({ mix: ROOT_ONLY });
+  const register = s().tracks[5]?.register ?? 0;
+
+  s().euclidize(5, 5, 8);
+
+  const cells = s().tracks[5]?.cells ?? [];
+  assert.equal(cells.length, 8);
+  assert.equal(cells.filter((c) => c !== null).length, 5, 'E(5,8) should give 5 onsets');
+  // The root of the mix is the store's root plus the track's register.
+  for (const cell of cells) {
+    if (cell === null) continue;
+    assert.equal(cell.pitch, s().root + register, `pitch ${cell.pitch} did not come from the mixer`);
+  }
+});
+
+test('euclidize honours the register offset', () => {
+  useGr00ve.setState({ mix: ROOT_ONLY });
+  const register = s().tracks[6]?.register ?? 0;
+
+  s().euclidize(6, 6, 16);
+  const before = pitchesOf(6);
+
+  useGr00ve.setState({
+    tracks: s().tracks.map((t, i) => (i === 6 ? { ...t, register: register + 12 } : t)),
+  });
+  s().euclidize(6, 6, 16);
+  const after = pitchesOf(6);
+
+  // Same seed and same weights, so only the register moved: every onset should
+  // be exactly an octave higher. A register that leaked into the seed instead
+  // would reshuffle the notes, and this would fail rather than quietly pass.
+  assert.deepEqual(after, before.map((p) => (p === null ? null : p + 12)));
+
+  useGr00ve.setState({
+    tracks: s().tracks.map((t, i) => (i === 6 ? { ...t, register } : t)),
+  });
+});
+
+test('moving a fader changes the generated pitches', () => {
+  useGr00ve.setState({ mix: ROOT_ONLY });
+  s().euclidize(6, 5, 16);
+  const low = pitchesOf(6);
+
+  useGr00ve.setState({ mix: OCTAVE_ONLY });
+  s().euclidize(6, 5, 16);
+  const high = pitchesOf(6);
+
+  assert.notDeepEqual(low, high, 'the faders had no effect on generation');
+});
+
+test('the root fader and the octave fader land an octave apart', () => {
+  // With one semitone weighted in each case, the two renders differ by exactly
+  // twelve semitones — which is what a probability mixer should do.
+  useGr00ve.setState({ mix: ROOT_ONLY });
+  s().euclidize(6, 5, 16);
+  const root = pitchesOf(6);
+
+  useGr00ve.setState({ mix: OCTAVE_ONLY });
+  s().euclidize(6, 5, 16);
+  const octave = pitchesOf(6);
+
+  assert.deepEqual(octave, root.map((p) => (p === null ? null : p + 12)));
+});
+
+test('generation is idempotent for the same parameters', () => {
+  // Clicking E twice must not re-roll: the seed comes from the parameters, so
+  // the phrase is stable until the performer changes something.
+  useGr00ve.setState({ mix: DEFAULT_MIX });
+  s().euclidize(6, 5, 16);
+  const first = s().tracks[6]?.cells;
+
+  s().euclidize(6, 5, 16);
+
+  assert.deepEqual(s().tracks[6]?.cells, first);
+});
+
+test('euclidize keeps exactly `pulses` onsets, for any k and n', () => {
+  // The gate is the rhythm, so the mixer must not punch holes in it — the
+  // failure this guards is a rest roll layered on top of a Euclidean mask.
+  useGr00ve.setState({ mix: { ...DEFAULT_MIX, restProbability: 1 } });
+  for (const [k, n] of [[3, 8], [5, 8], [4, 16], [7, 16]] as const) {
+    s().euclidize(6, k, n);
+    const cells = s().tracks[6]?.cells ?? [];
+    assert.equal(cells.length, n);
+    assert.equal(cells.filter((c) => c !== null).length, k, `E(${k},${n})`);
+  }
+});
+
+test('generated pitches stay inside the scale, even with wild weights', () => {
+  // Every semitone weighted, so the snap is doing real work. Note the register
+  // is applied to the mix's root, so membership is checked against that.
+  useGr00ve.setState({
+    mix: { ...DEFAULT_MIX, restProbability: 0, weights: new Array<number>(12).fill(1), octaves: [1, 1, 1] },
+  });
+  const register = s().tracks[6]?.register ?? 0;
+  s().euclidize(6, 8, 16);
+
+  const { root, scale } = s();
+  for (const cell of s().tracks[6]?.cells ?? []) {
+    if (cell === null) continue;
+    assert.ok(
+      inScale(cell.pitch, root + register, scale),
+      `pitch ${cell.pitch} is outside ${scale} at root ${root + register}`,
+    );
+  }
+});
+
+test('euclidize sets the loop length to the generated grid', () => {
+  s().euclidize(6, 5, 12);
+  assert.equal(s().tracks[6]?.cells.length, 12);
+  assert.equal(s().tracks[6]?.length, 12);
 });

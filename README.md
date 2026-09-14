@@ -26,9 +26,11 @@ bound to the UI.
 melodic and polymetric against it. Plus **voice/rhythm** switching, toggling
 steps, dragging knobs (relative drag — no jump on grab), Shift for fine adjust,
 arrow keys, double-click to type a value, switching scales, per-track loop
-length, the 12-fader pitch mixer, and **E(k,n)** — click a track's `E(5,8)`
-button to write a Euclidean pattern into it. Underneath it, **Clear** empties
-that track's steps.
+length, and **E(k,n)** — click a track's `E(5,8)` button to write a Euclidean
+pattern into it. Underneath it, **Clear** empties that track's steps.
+
+The **twelve pitch faders drive generation**: they decide which notes E(k,n)
+writes. Moving a fader and pressing E again gives a different phrase.
 
 > **There is no undo yet.** Clear is immediate and unrecoverable; regenerating
 > with `E(k,n)` is the way back. The brief lists undo as a recommended control,
@@ -39,15 +41,48 @@ that track's steps.
 - **No MIDI input yet.** The mapping semantics (encoder relative modes, fader
   pickup) and the Launch Control XL 3 / APC mini mk2 SysEx are implemented and
   tested in `@gr00ve/midi`, but nothing is bound to the UI.
+- **Track register isn't exposed.** Each track carries a semitone offset applied
+  to the mixer's pitches, seeded per track so eight tracks don't all generate in
+  one octave — but there is no control for it yet.
 - **Drum tuning isn't exposed.** `DrumParams` carries `tune` and `decay`
   multipliers and `DrumVoice` honours both, but every drum plays at its designed
   tuning — two encoders per rhythm track is the obvious next step.
-- **The pitch mixer isn't wired to generation.** The 12 faders hold state and
-  the generators exist, but the two are not connected yet: `E(k,n)` builds its
-  pitches from the scale, not from the fader weights.
 - **Resonance-coupled accent is not modelled** — see the note in
   `packages/audio/src/index.ts`. It is the highest-value next addition to the
   voice.
+
+### How generation composes
+
+**Euclidean answers *when*. The pitch mixer answers *what*.** Neither tries to
+do the other's job, and `generateCells` in `apps/web/src/state/store.ts` is the
+one place they meet.
+
+That split is load-bearing. The mixer has a rest probability of its own, and
+applying it on top of a Euclidean mask would punch holes in a rhythm the
+performer deliberately dialled in — which reads as the Euclid generator being
+broken. So when a gate is supplied, the gate owns *when*: `restProbability` is
+ignored, and accents follow the metre rather than the mix's accent probability,
+because accent placement is part of a rhythm rather than part of a pitch choice.
+
+Two consequences worth knowing:
+
+- **Generation is idempotent.** The seed is derived from the parameters
+  (`combineSeed(trackIndex, pulses, steps)`), not drawn fresh, so clicking E
+  twice gives the same phrase. Moving a fader and clicking again *does* change
+  the output — the random stream is identical, but a weighted choice against
+  different weights lands elsewhere. That is "evolve rather than re-roll"
+  without a seed knob to manage.
+- **Pitches are snapped into the scale**, so a weighted semitone that falls
+  between scale notes lands on the nearest one rather than being discarded. The
+  chromatic faders plus a quantiser is what the hardware does. It also means a
+  semitone weight is not an exact semitone: weighted a fifth, you get the
+  nearest in-scale note. An octave survives untouched, which is why the tests
+  use octave weights when they need an exact interval.
+- **The default mixer's octave weights are deliberately narrow.** A third
+  octave put G5 in the same bar as C3 — a 2.5-octave leap inside one line —
+  against the brief's finding that an electronic melody occupies about 1–1.5
+  octaves. Worst case is now 22 semitones. The span is set by the *weights*, not
+  enforced by the generator, which is the mixer doing its job.
 
 ### Voice and rhythm tracks
 

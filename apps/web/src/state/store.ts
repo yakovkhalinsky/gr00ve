@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import {
-  DEFAULT_MIX, DEFAULT_KIT, euclid, grid, degreeToPitch,
+  DEFAULT_MIX, DEFAULT_KIT, combineSeed, degreeToPitch, euclid, grid, makeRng, pitchMixer,
   type DrumType, type PitchMix, type ScaleName, type Step, type StepGrid as Cells, type TrackKind,
 } from '@gr00ve/core';
 
@@ -48,6 +48,19 @@ export interface TrackState {
   readonly kind: TrackKind;
   /** Which drum, when `kind` is `'rhythm'`. */
   readonly drum: DrumType;
+  /**
+   * Semitone offset applied to pitches drawn from the mixer. ±12, ±24.
+   *
+   * The pitch mixer is global — one set of twelve faders for the whole rack —
+   * so without a per-track offset every voice track would generate in the same
+   * octave and the result would be mud. Register is the property that makes a
+   * shared pitch source usable across eight tracks, and it is a real hardware
+   * concept too (track transpose on an Elektron box).
+   *
+   * Not exposed in the UI yet; seeded per track. Wiring an encoder to it is a
+   * small, obvious follow-up.
+   */
+  readonly register: number;
 }
 
 export interface Gr00veState {
@@ -105,25 +118,39 @@ export interface Gr00veState {
 interface SeedSpec {
   readonly pulses: number;
   readonly steps: number;
-  readonly degree: number;
+  /** Semitone offset applied to the mixer's pitches. */
+  readonly register: number;
   readonly kind: TrackKind;
   readonly drum: DrumType;
 }
 
 const SEED: readonly SeedSpec[] = [
   // The kit. E(4,16) is four-on-the-floor; E(8,16) is eighth-note hats.
-  { pulses: 4, steps: 16, degree: 0, kind: 'rhythm', drum: 'kick' },
-  { pulses: 3, steps: 16, degree: 0, kind: 'rhythm', drum: 'clap' },
-  { pulses: 8, steps: 16, degree: 0, kind: 'rhythm', drum: 'hat' },
-  { pulses: 5, steps: 16, degree: 0, kind: 'rhythm', drum: 'rim' },
-  // Melodic, and polymetric against the kit.
-  { pulses: 4, steps: 16, degree: -7, kind: 'voice', drum: 'kick' }, // bass, an octave down
-  { pulses: 5, steps: 8, degree: 0, kind: 'voice', drum: 'kick' },
-  { pulses: 3, steps: 7, degree: 5, kind: 'voice', drum: 'kick' },
-  { pulses: 5, steps: 13, degree: 9, kind: 'voice', drum: 'kick' },
+  // Register is unused on a rhythm track — drums ignore pitch.
+  { pulses: 4, steps: 16, register: 0, kind: 'rhythm', drum: 'kick' },
+  { pulses: 3, steps: 16, register: 0, kind: 'rhythm', drum: 'clap' },
+  { pulses: 8, steps: 16, register: 0, kind: 'rhythm', drum: 'hat' },
+  { pulses: 5, steps: 16, register: 0, kind: 'rhythm', drum: 'rim' },
+  // Melodic, spread across three registers, and polymetric against the kit.
+  // Two tracks share the middle register deliberately — their loop lengths (8
+  // and 7) drift against each other, so they interleave rather than collide.
+  { pulses: 4, steps: 16, register: -12, kind: 'voice', drum: 'kick' }, // bass
+  { pulses: 5, steps: 8, register: 0, kind: 'voice', drum: 'kick' },
+  { pulses: 3, steps: 7, register: 0, kind: 'voice', drum: 'kick' },
+  { pulses: 5, steps: 13, register: 12, kind: 'voice', drum: 'kick' },
 ];
 
-/** Build a grid from a Euclidean mask — the rhythmic spine of a track. */
+/**
+ * Build a grid from a Euclidean mask, taking pitches from the **scale itself**
+ * rather than from the mixer.
+ *
+ * This is the degree-based Euclidean melody the brief calls underrated — it
+ * yields a Sturmian contour with only two interval sizes, so it is even rather
+ * than random. It is **not** what the E button runs: that goes through
+ * `generateCells`, so the twelve pitch faders are what decide the notes. Kept
+ * exported and tested as an alternative generator, and as the thing to reach
+ * for if the mixer ever needs a degree-based counterpart.
+ */
 export function euclidCells(
   pulses: number,
   steps: number,
@@ -149,14 +176,57 @@ export function euclidCells(
   );
 }
 
+/**
+ * Compose a rhythm with a pitch source.
+ *
+ * **Euclidean answers *when*, the pitch mixer answers *what*.** This is the one
+ * place the two meet, so the generate button, the startup seed and any future
+ * generator all behave identically — and so there is a single function to look
+ * at when the output is wrong.
+ *
+ * The seed is derived from the *parameters* rather than drawn fresh, which
+ * makes generation idempotent: clicking E(5,8) twice gives the same phrase,
+ * while moving a pitch fader and clicking again gives a different one (the
+ * random stream is identical; a weighted choice against different weights just
+ * lands elsewhere). See `combineSeed`.
+ */
+export function generateCells(opts: {
+  readonly pulses: number;
+  readonly steps: number;
+  readonly seed: number;
+  readonly mix: PitchMix;
+  readonly root: number;
+  readonly scale: ScaleName;
+  readonly register: number;
+}): Cells {
+  const gate = euclid(opts.pulses, opts.steps);
+  return pitchMixer(
+    // The store's root and scale are the single source of truth; the mix's own
+    // copies are overridden so a scale change in the transport bar applies to
+    // generation rather than being shadowed by a stale value on the mix.
+    { ...opts.mix, root: opts.root + opts.register, scale: opts.scale },
+    opts.steps,
+    makeRng(opts.seed),
+    gate,
+  );
+}
+
 function seedTrack(index: number, root: number, scale: ScaleName): TrackState {
   const pattern: SeedSpec = SEED[index % SEED.length] ?? {
-    pulses: 4, steps: 16, degree: 0, kind: 'voice', drum: 'kick',
+    pulses: 4, steps: 16, register: 0, kind: 'voice', drum: 'kick',
   };
   return {
     id: `track-${index + 1}`,
     name: `Track ${index + 1}`,
-    cells: euclidCells(pattern.pulses, pattern.steps, root, scale, { baseDegree: pattern.degree }),
+    cells: generateCells({
+      pulses: pattern.pulses,
+      steps: pattern.steps,
+      seed: combineSeed(index, pattern.pulses, pattern.steps),
+      mix: DEFAULT_MIX,
+      root,
+      scale,
+      register: pattern.register,
+    }),
     // Loop length matches the generated grid, and stays independent of it —
     // editing the length later must not rewrite the pattern.
     length: pattern.steps,
@@ -164,6 +234,7 @@ function seedTrack(index: number, root: number, scale: ScaleName): TrackState {
     solo: false,
     kind: pattern.kind,
     drum: pattern.drum ?? DEFAULT_KIT[index % DEFAULT_KIT.length] ?? 'kick',
+    register: pattern.register,
   };
 }
 
@@ -218,8 +289,21 @@ export const useGr00ve = create<Gr00veState>()(
     },
 
     euclidize: (trackIndex, pulses, steps) => {
-      const { tracks, root, scale } = get();
-      const cells = euclidCells(pulses, steps, root, scale);
+      const { tracks, root, scale, mix } = get();
+      const track = tracks[trackIndex];
+      if (!track) return;
+      const cells = generateCells({
+        pulses,
+        steps,
+        // Seeded from the parameters: idempotent for a given E(k,n), but still
+        // responsive to the pitch faders, because the weights changed even
+        // though the random stream did not.
+        seed: combineSeed(trackIndex, pulses, steps),
+        mix,
+        root,
+        scale,
+        register: track.register,
+      });
       const next = tracks.map((t, i) => (i === trackIndex ? { ...t, cells, length: steps } : t));
       set({ tracks: next });
     },

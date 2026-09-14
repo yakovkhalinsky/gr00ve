@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { makeRng, randInt, randRange, chance, pick, weightedIndex } from './rng.ts';
+import { makeRng, randInt, randRange, chance, pick, weightedIndex, combineSeed } from './rng.ts';
 
 test('is deterministic — same seed, same stream', () => {
   const a = makeRng(1234);
@@ -101,4 +101,53 @@ test('weightedIndex falls back to uniform when all weights are zero', () => {
   const seen = new Set<number>();
   for (let i = 0; i < 500; i++) seen.add(weightedIndex(rng, [0, 0, 0, 0]));
   assert.equal(seen.size, 4);
+});
+
+// --- combineSeed ------------------------------------------------------------
+
+test('combineSeed is deterministic', () => {
+  assert.equal(combineSeed(1, 5, 8), combineSeed(1, 5, 8));
+  assert.equal(combineSeed(0), combineSeed(0));
+});
+
+test('combineSeed is order-sensitive', () => {
+  // Otherwise (1, 2) and (2, 1) would collide, and two tracks with swapped
+  // parameters would generate identical phrases.
+  assert.notEqual(combineSeed(1, 2), combineSeed(2, 1));
+  assert.notEqual(combineSeed(1, 2, 3), combineSeed(3, 2, 1));
+});
+
+test('combineSeed separates neighbouring inputs', () => {
+  // The realistic collisions: adjacent track indices at the same E(k,n), and
+  // the same track at adjacent k.
+  const seeds = new Set<number>();
+  for (let track = 0; track < 8; track++) seeds.add(combineSeed(track, 5, 16));
+  assert.equal(seeds.size, 8, 'track indices collided');
+  const byK = new Set<number>();
+  for (let k = 1; k <= 16; k++) byK.add(combineSeed(0, k, 16));
+  assert.equal(byK.size, 16, 'k values collided');
+});
+
+test('combineSeed returns a usable 32-bit seed', () => {
+  for (const args of [[0], [1, 2, 3], [99, 16, 16], [-5, 7]] as const) {
+    const seed = combineSeed(...args);
+    assert.ok(Number.isInteger(seed), `${seed} is not an integer`);
+    assert.ok(seed >= 0 && seed <= 0xffffffff, `${seed} out of 32-bit range`);
+    // And it must actually drive the generator.
+    assert.notEqual(makeRng(seed)(), undefined);
+  }
+});
+
+test('combineSeed with no arguments still yields a seed', () => {
+  const seed = combineSeed();
+  assert.ok(Number.isInteger(seed) && seed >= 0);
+});
+
+test('distinct seeds produce distinct streams', () => {
+  // A weak mix would show up as two tracks generating nearly the same phrase.
+  const a = makeRng(combineSeed(0, 5, 16));
+  const b = makeRng(combineSeed(1, 5, 16));
+  let same = 0;
+  for (let i = 0; i < 100; i++) if (a() === b()) same++;
+  assert.ok(same < 5, 'neighbouring seeds produced coincident streams');
 });
