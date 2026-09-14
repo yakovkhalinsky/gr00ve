@@ -59,8 +59,14 @@ pattern — five evenly-spread hits in eight steps.
 change — swing redistributes time *within* the bar, it doesn't stretch it, so
 the pattern still realigns at exactly the same moment.
 
-**7. Clear something.** Click **Clear** on Track 3. It empties. There's no undo,
-so get it back with **E(4,16)**.
+**7. Overshoot, then come back.** Press **E** a few times on Track 1. Each press
+is a new phrase, and each one is kept — the counter beside the button climbs as
+you go. Now press **‹**; the previous phrase returns exactly. Keep going back to
+the one you liked.
+
+**8. Clear something, then get it back.** Click **Clear** on Track 3. It empties.
+Press **‹** in that track's stepper and the pattern comes back. Clearing is kept
+too, so nothing you do to a track's steps is final.
 
 ---
 
@@ -116,8 +122,9 @@ Each of the eight rows is a track. Left to right:
 | **Loop** | The track's loop length in steps, from 1 up to the pattern's own length. This is the polymeter control. |
 | **Mode (Voice / Rhythm)** | Switches the track between pitched notes and one drum sound. Filled blue in Rhythm mode. |
 | **Drum** | Which drum. Greyed out on a Voice track — but it still shows what the track *would* play if you switched it. |
-| **E(k,n)** | Writes a Euclidean pattern into this track, using the Pulses and Steps from the generator panel at the bottom of the page. |
-| **Clear** | Empties the track's steps. **No undo.** |
+| **E(k,n)** | Writes a Euclidean pattern into this track, using the Pulses and Steps from the generator panel at the bottom of the page. Every press gives a new phrase and keeps the old one. |
+| **‹ 3/7 ›** | Steps through this track's saved versions. See below. |
+| **Clear** | Empties the track's steps. Recoverable with the version stepper. |
 | Step grid | See below. |
 
 **Loop length and pattern length are separate.** Lowering a track's Loop to 5
@@ -154,6 +161,27 @@ step 9 is step 9, not "row 2, step 1".
 
 Hand-placed steps are **unaccented**. Only generated patterns accent their
 downbeats — so if you want accents, generate, then edit around them.
+
+### Versions
+
+Every generate and every Clear is recorded, and the stepper beside the generate
+button walks through them: **`‹ 3/7 ›`** means you are looking at the third of
+seven saved versions. The number is a position rather than a tally of presses —
+generate after stepping back and the versions ahead of you are discarded, the
+way an editor's undo works.
+
+Each track keeps its own history, of the last sixteen versions. The generation
+seed is in the tooltip, so a phrase is identifiable even though there is no
+control to dial a particular one back in directly.
+
+**A version stores the steps themselves, not the seed they came from.** That
+distinction is the point: a version restores exactly what you had, including any
+steps you placed or removed by hand. Regenerating from a stored seed would
+return the notes the generator made and quietly drop your edits.
+
+**Editing is not recorded**, so stepping back restores the last *saved* version
+and discards anything done since. The counter does not move while you edit,
+which is the cue that those changes are not yet a version.
 
 ### The generator panel
 
@@ -250,8 +278,11 @@ seeing it.
 
 Things that are missing rather than hidden:
 
-- **No undo.** Clear is immediate and unrecoverable. Regenerating with E(k,n) is
-  the way back, which works for generated patterns but not hand-edited ones.
+- **Versions cover generate and Clear, not editing.** Stepping back restores a
+  saved version exactly — including any hand edits that were in place when it
+  was saved — but toggling a step or moving the Loop knob happens live and is
+  not recorded. Stepping through versions will discard edits made since the last
+  generate.
 - **No saving.** A page reload loses everything. There's no export yet either.
 - **The generator panel is below the tracks**, so the `k` and `n` that E(k,n)
   uses are off-screen when you press it. A layout wart.

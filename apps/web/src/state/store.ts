@@ -22,6 +22,32 @@ import {
 export const TRACK_COUNT = 8;
 export const DEFAULT_STEPS = 16;
 
+/**
+ * How many versions of a track's steps are kept.
+ *
+ * Sixteen is roughly a minute of pressing generate at a listening pace — enough
+ * to cover the workflow this exists for, which is to press generate a few
+ * times, hear something worth keeping, overshoot it, and want it back. Bounded
+ * rather than unbounded because it is per track: eight tracks of unlimited
+ * history is a memory leak with a friendly name.
+ */
+export const HISTORY_LIMIT = 16;
+
+/**
+ * One version of a track's steps.
+ *
+ * Holds the *cells*, not just the seed. Regenerating from a seed would restore
+ * the generated pattern but discard anything edited by hand afterwards, and
+ * "put back what I had" should mean exactly that. The seed rides along so it
+ * can be shown and, later, dialled back to directly.
+ */
+export interface Snapshot {
+  readonly seed: number;
+  readonly cells: Cells;
+  /** Loop length at the time. `euclidize` sets this to the pattern's length. */
+  readonly length: number;
+}
+
 export interface TrackState {
   readonly id: string;
   readonly name: string;
@@ -89,6 +115,15 @@ export interface TrackState {
    * researched next step.
    */
   readonly seed: number;
+  /**
+   * Versions of this track's steps, oldest first.
+   *
+   * Both generate and clear push one, so the same control recovers a pattern
+   * that was regenerated past *or* wiped — the two ways a track loses its steps.
+   */
+  readonly history: readonly Snapshot[];
+  /** Which entry of `history` the track is currently showing. */
+  readonly historyIndex: number;
 }
 
 export interface Gr00veState {
@@ -124,6 +159,13 @@ export interface Gr00veState {
   clearTrack: (trackIndex: number) => void;
   setTrackKind: (trackIndex: number, kind: TrackKind) => void;
   setDrum: (trackIndex: number, drum: DrumType) => void;
+  /**
+   * Step through a track's versions. `delta` is -1 for older, +1 for newer.
+   *
+   * A no-op at either end of the history, so callers can wire a button to it
+   * without bounds-checking.
+   */
+  stepHistory: (trackIndex: number, delta: number) => void;
 
   /**
    * Id of the selected MIDI output, or null for none.
@@ -264,24 +306,73 @@ export function generateCells(opts: {
   );
 }
 
+/**
+ * Append a snapshot, trimming the oldest once the limit is reached.
+ *
+ * Truncates anything *ahead* of the cursor first. Stepping back and then
+ * generating branches the history rather than leaving entries that can never be
+ * reached — the same behaviour an editor's undo stack has, and the reason the
+ * cursor is an index rather than the list simply being a stack.
+ */
+function pushSnapshot(
+  history: readonly Snapshot[],
+  historyIndex: number,
+  snapshot: Snapshot,
+): { history: Snapshot[]; historyIndex: number } {
+  const kept = [...history.slice(0, historyIndex + 1), snapshot];
+  const trimmed = kept.slice(-HISTORY_LIMIT);
+  return { history: trimmed, historyIndex: trimmed.length - 1 };
+}
+
+/** A snapshot of a track as it stands. */
+function snapshotOf(track: TrackState): Snapshot {
+  return { seed: track.seed, cells: track.cells, length: track.length };
+}
+
+/**
+ * Record a change to a track's steps, keeping the state it replaces.
+ *
+ * The subtlety is hand edits. A track's visible cells are not necessarily the
+ * version its cursor points at — editing a step leaves the stored version
+ * behind, because the store's history is only written by generate and clear.
+ * Generating from there and storing only the new pattern would drop the edit
+ * out of reach entirely: stepping back would land on the version *before* it
+ * and jump straight past.
+ *
+ * Reference equality is enough to detect that, and cheap: every action here
+ * builds a new cells array rather than mutating one, so a differing reference
+ * means an unrecorded edit.
+ */
+function recordVersion(track: TrackState, next: Snapshot): { history: Snapshot[]; historyIndex: number } {
+  const stored = track.history[track.historyIndex];
+  const edited = stored === undefined || stored.cells !== track.cells;
+
+  const base = edited
+    ? pushSnapshot(track.history, track.historyIndex, snapshotOf(track))
+    : { history: track.history, historyIndex: track.historyIndex };
+
+  return pushSnapshot(base.history, base.historyIndex, next);
+}
+
 function seedTrack(index: number, root: number, scale: ScaleName): TrackState {
   const pattern: SeedSpec = SEED[index % SEED.length] ?? {
     pulses: 4, steps: 16, rotation: 0, register: 0, kind: 'voice', drum: 'kick',
   };
   const seed = combineSeed(index, pattern.pulses, pattern.steps);
+  const cells = generateCells({
+    pulses: pattern.pulses,
+    steps: pattern.steps,
+    rotation: pattern.rotation,
+    seed,
+    mix: DEFAULT_MIX,
+    root,
+    scale,
+    register: pattern.register,
+  });
   return {
     id: `track-${index + 1}`,
     name: `Track ${index + 1}`,
-    cells: generateCells({
-      pulses: pattern.pulses,
-      steps: pattern.steps,
-      rotation: pattern.rotation,
-      seed,
-      mix: DEFAULT_MIX,
-      root,
-      scale,
-      register: pattern.register,
-    }),
+    cells,
     // Loop length matches the generated grid, and stays independent of it —
     // editing the length later must not rewrite the pattern.
     length: pattern.steps,
@@ -292,7 +383,23 @@ function seedTrack(index: number, root: number, scale: ScaleName): TrackState {
     register: pattern.register,
     rotation: pattern.rotation,
     seed,
+    // The seeded pattern is version one, so stepping back has a floor rather
+    // than landing on nothing.
+    history: [{ seed, cells, length: pattern.steps }],
+    historyIndex: 0,
   };
+}
+
+/**
+ * The eight seeded tracks, built fresh.
+ *
+ * Exported so the tests can reset the store singleton between cases. Without
+ * it they share whatever earlier cases left behind, and a test asserting what a
+ * *fresh* track looks like quietly depends on no previous test having touched
+ * it — which is a claim that gets less true every time a test is added.
+ */
+export function initialTracks(root = 45, scale: ScaleName = 'minorPentatonic'): TrackState[] {
+  return Array.from({ length: TRACK_COUNT }, (_, i) => seedTrack(i, root, scale));
 }
 
 export const useGr00ve = create<Gr00veState>()(
@@ -306,7 +413,7 @@ export const useGr00ve = create<Gr00veState>()(
     root: 45,
     scale: 'minorPentatonic',
     mix: DEFAULT_MIX,
-    tracks: Array.from({ length: TRACK_COUNT }, (_, i) => seedTrack(i, 45, 'minorPentatonic')),
+    tracks: initialTracks(),
 
     setBpm: (bpm) => set({ bpm: Math.max(20, Math.min(300, bpm)) }),
     setSwing: (swing) => set({ swing: Math.max(0, Math.min(0.9, swing)) }),
@@ -380,10 +487,41 @@ export const useGr00ve = create<Gr00veState>()(
         scale,
         register: track.register,
       });
+      // Every generate is recoverable, so overshooting the pattern you wanted
+      // is no longer the end of it.
+      const { history, historyIndex } = recordVersion(track, { seed, cells, length: steps });
+
       const next = tracks.map((t, i) =>
-        (i === trackIndex ? { ...t, cells, length: steps, seed } : t),
+        (i === trackIndex ? { ...t, cells, length: steps, seed, history, historyIndex } : t),
       );
       set({ tracks: next });
+    },
+
+    stepHistory: (trackIndex, delta) => {
+      const tracks = get().tracks;
+      const track = tracks[trackIndex];
+      if (!track) return;
+
+      const index = track.historyIndex + Math.sign(delta);
+      const snapshot = track.history[index];
+      if (!snapshot) return; // at an end of the history
+
+      set({
+        tracks: tracks.map((t, i) =>
+          i === trackIndex
+            ? {
+                ...t,
+                cells: snapshot.cells,
+                // Restored along with the steps: a version *is* its pattern and
+                // its length, and bringing back the notes without the loop they
+                // were written for would leave the tail silent.
+                length: snapshot.length,
+                seed: snapshot.seed,
+                historyIndex: index,
+              }
+            : t,
+        ),
+      });
     },
 
     /**
@@ -396,9 +534,19 @@ export const useGr00ve = create<Gr00veState>()(
      * "clear the notes" action into a structural edit.
      */
     clearTrack: (trackIndex) => {
-      const tracks = get().tracks.map((t, i) =>
-        i === trackIndex ? { ...t, cells: new Array<Step | null>(t.cells.length).fill(null) } : t,
-      );
+      const tracks = get().tracks.map((t, i) => {
+        if (i !== trackIndex) return t;
+        const cells = new Array<Step | null>(t.cells.length).fill(null);
+        // Clearing records a version too, so it is recoverable through the same
+        // control. That closes the "no undo for Clear" gap without a second
+        // mechanism: both ways a track loses its steps are now steppable.
+        const { history, historyIndex } = recordVersion(t, {
+          seed: t.seed,
+          cells,
+          length: t.length,
+        });
+        return { ...t, cells, history, historyIndex };
+      });
       set({ tracks });
     },
 

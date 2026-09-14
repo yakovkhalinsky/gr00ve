@@ -148,8 +148,33 @@ body {
 .track__mute, .track__euclid, .track__clear { min-height: 32px; padding: 0 10px; background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; cursor: pointer; font-size: 12px; }
 .track__mute[aria-pressed='true'] { background: var(--accent-hot); border-color: var(--accent-hot); }
 
-/* Generate and erase stacked as one column. */
+/* Generate, version-step and erase stacked as one column — the three things
+ * that change a track's steps, in the order you reach for them. */
 .track__gen { display: flex; flex-direction: column; gap: 4px; }
+
+/* Version stepping. Fixed height even when disabled, so nothing shifts. */
+.track__hist { display: flex; align-items: center; justify-content: center; gap: 3px; }
+.track__histBtn {
+  width: 24px;
+  min-height: 26px;
+  padding: 0;
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+.track__histBtn:hover:not(:disabled) { border-color: var(--accent); }
+.track__histBtn:disabled { opacity: 0.28; cursor: default; }
+.track__histPos {
+  min-width: 27px;
+  text-align: center;
+  font-size: 10px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
 
 /* Voice / rhythm mode, plus the drum picker.
  *

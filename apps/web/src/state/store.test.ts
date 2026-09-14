@@ -1,8 +1,25 @@
-import { test } from 'node:test';
+import { beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { DEFAULT_MIX, inScale } from '@gr00ve/core';
-import { euclidCells, generateCells, useGr00ve } from './store.ts';
+import { HISTORY_LIMIT, euclidCells, generateCells, initialTracks, useGr00ve } from './store.ts';
+
+/**
+ * Reset the store between cases.
+ *
+ * It is a module singleton, so without this every case inherits whatever the
+ * previous one left behind — which made a test asserting what a *fresh* track
+ * looks like depend on no earlier test having generated on it. That held until
+ * a test was added that did.
+ */
+beforeEach(() => {
+  useGr00ve.setState({
+    tracks: initialTracks(),
+    mix: DEFAULT_MIX,
+    root: 45,
+    scale: 'minorPentatonic',
+  });
+});
 
 /**
  * Only the pure helpers and the store's own transitions are testable here.
@@ -375,6 +392,136 @@ test('generating does not disturb the other tracks', () => {
   const sibling = s().tracks[5];
   s().euclidize(6, 5, 16);
   assert.equal(s().tracks[5], sibling, 'a sibling track was rebuilt');
+});
+
+// --- version history --------------------------------------------------------
+//
+// The researched primitive this copies is meloDICER's DICE round-trip: press to
+// generate, press again to return to the exact previous pattern. Its purpose is
+// to make overshooting the phrase you wanted survivable.
+
+/** A compact picture of a track's steps, for comparing before and after. */
+const shape = (i: number): string =>
+  (s().tracks[i]?.cells ?? []).map((c) => (c ? 'x' : '.')).join('');
+
+const pitches = (i: number): string =>
+  (s().tracks[i]?.cells ?? []).map((c) => (c ? c.pitch : '')).join(',');
+
+test('a fresh track has exactly one version, its seeded pattern', () => {
+  const t = s().tracks[0];
+  assert.ok(t);
+  assert.equal(t.history.length, 1);
+  assert.equal(t.historyIndex, 0, 'a fresh track should be at its only version');
+  assert.deepEqual(t.history[0]?.cells, t.cells);
+});
+
+test('generating pushes a version, and both directions step through them', () => {
+  useGr00ve.setState({ mix: DEFAULT_MIX });
+  s().euclidize(6, 5, 16);
+  const first = pitches(6);
+  s().euclidize(6, 5, 16);
+  const second = pitches(6);
+
+  s().stepHistory(6, -1);
+  assert.equal(pitches(6), first, 'stepping back did not restore the first pattern');
+
+  s().stepHistory(6, 1);
+  assert.equal(pitches(6), second, 'stepping forward did not restore the second');
+});
+
+test('a version keeps hand edits, which a seed alone would not', () => {
+  // Why snapshots hold cells rather than only a seed: regenerating from a seed
+  // restores the generated notes and discards anything edited by hand
+  // afterwards, and "put back what I had" has to mean exactly that.
+  s().euclidize(0, 5, 16);
+  s().toggleStep(0, 1); // a hand-placed step on an otherwise empty slot
+  const edited = shape(0);
+  assert.ok(edited.includes('x'));
+
+  s().euclidize(0, 5, 16);
+  s().stepHistory(0, -1);
+
+  assert.equal(shape(0), edited, 'hand edits were lost restoring a version');
+});
+
+test('Clear is recoverable through the same control', () => {
+  // Both ways a track loses its steps — regenerated past, or wiped — are now
+  // steppable, which closes the "no undo for Clear" gap without a second
+  // mechanism.
+  useGr00ve.setState({ mix: DEFAULT_MIX });
+  s().euclidize(5, 5, 16);
+  const before = shape(5);
+  assert.ok(before.includes('x'), 'setup: expected a pattern');
+
+  s().clearTrack(5);
+  assert.equal(shape(5), '.'.repeat(16), 'setup: expected an empty track');
+
+  s().stepHistory(5, -1);
+  assert.equal(shape(5), before, 'Clear was not recoverable');
+});
+
+test('a version restores its loop length as well as its steps', () => {
+  // A version is its pattern *and* its length. Bringing back the notes without
+  // the loop they were written for would leave the tail of the grid silent.
+  s().euclidize(3, 5, 16);
+  const wide = s().tracks[3]?.length;
+  s().euclidize(3, 3, 8);
+  assert.equal(s().tracks[3]?.length, 8, 'setup: expected the shorter loop');
+
+  s().stepHistory(3, -1);
+
+  assert.equal(s().tracks[3]?.length, wide, 'loop length was not restored');
+});
+
+test('stepping past either end is a no-op, not a wrap', () => {
+  const atOldest = { ...s().tracks[1]!, historyIndex: 0 };
+  useGr00ve.setState({ tracks: s().tracks.map((t, i) => (i === 1 ? atOldest : t)) });
+  const before = s().tracks[1];
+
+  s().stepHistory(1, -1);
+  assert.equal(s().tracks[1], before, 'state changed at the oldest version');
+
+  const t = s().tracks[1]!;
+  const atNewest = { ...t, historyIndex: t.history.length - 1 };
+  useGr00ve.setState({ tracks: s().tracks.map((x, i) => (i === 1 ? atNewest : x)) });
+  const atEnd = s().tracks[1];
+
+  s().stepHistory(1, 1);
+  assert.equal(s().tracks[1], atEnd, 'state changed at the newest version');
+});
+
+test('generating after stepping back branches rather than stacking', () => {
+  // An editor's undo behaviour: the redo branch is discarded. Otherwise the
+  // history fills with versions that can never be reached.
+  s().euclidize(2, 5, 16);
+  const lengthBefore = s().tracks[2]?.history.length ?? 0;
+
+  s().stepHistory(2, -1);
+  s().euclidize(2, 5, 16);
+
+  const t = s().tracks[2];
+  assert.equal(t?.history.length, lengthBefore, 'history did not truncate the abandoned branch');
+  assert.equal(t?.historyIndex, (t?.history.length ?? 1) - 1, 'cursor is not at the newest version');
+});
+
+test('history is bounded, so eight tracks cannot grow without limit', () => {
+  for (let i = 0; i < HISTORY_LIMIT + 6; i++) s().euclidize(4, 5, 16);
+
+  const t = s().tracks[4];
+  assert.ok((t?.history.length ?? 0) <= HISTORY_LIMIT, `history grew to ${t?.history.length}`);
+  assert.equal(t?.historyIndex, (t?.history.length ?? 1) - 1, 'cursor lost after trimming');
+});
+
+test('a track with no history at all does not crash', () => {
+  // Defensive: every track is born with one version, but a restored or
+  // hand-built state might not be.
+  useGr00ve.setState({
+    tracks: s().tracks.map((t, i) => (i === 7 ? { ...t, history: [], historyIndex: 0 } : t)),
+  });
+  const before = s().tracks[7];
+  s().stepHistory(7, -1);
+  s().stepHistory(7, 1);
+  assert.equal(s().tracks[7], before);
 });
 
 test('euclidize keeps exactly `pulses` onsets, for any k and n', () => {

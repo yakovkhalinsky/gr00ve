@@ -67,6 +67,7 @@ export function App(): React.JSX.Element {
   const clearTrack = useGr00ve((s) => s.clearTrack);
   const setTrackKind = useGr00ve((s) => s.setTrackKind);
   const setDrum = useGr00ve((s) => s.setDrum);
+  const stepHistory = useGr00ve((s) => s.stepHistory);
 
   // Local generator controls, pending a proper "generator per track" model.
   const [pulses, setPulses] = useState(5);
@@ -253,6 +254,39 @@ export function App(): React.JSX.Element {
                 >
                   E({pulses},{steps})
                 </button>
+                {/* Version stepping. Both generate and Clear push a version,
+                  * so this recovers a pattern that was regenerated past as well
+                  * as one that was wiped — the two ways a track loses its steps.
+                  *
+                  * Disabled at the ends rather than hidden, for the same reason
+                  * the drum picker stays put: a row that appears and disappears
+                  * moves everything around it. */}
+                <div className="track__hist">
+                  <button
+                    type="button"
+                    className="track__histBtn"
+                    disabled={track.historyIndex <= 0}
+                    aria-label={`Older pattern for ${track.name}`}
+                    title={`Previous version — seed ${track.seed}`}
+                    onClick={() => stepHistory(i, -1)}
+                  >
+                    ‹
+                  </button>
+                  <span className="track__histPos" title={`seed ${track.seed}`}>
+                    {track.historyIndex + 1}/{track.history.length}
+                  </span>
+                  <button
+                    type="button"
+                    className="track__histBtn"
+                    disabled={track.historyIndex >= track.history.length - 1}
+                    aria-label={`Newer pattern for ${track.name}`}
+                    title="Next version"
+                    onClick={() => stepHistory(i, 1)}
+                  >
+                    ›
+                  </button>
+                </div>
+
                 <button
                   type="button"
                   className="track__clear"

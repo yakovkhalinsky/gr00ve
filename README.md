@@ -41,9 +41,10 @@ writes. Moving a fader and pressing E again gives a different phrase.
 on/off, and optional 24 ppqn clock. Built for a MIDI-to-CV module in a Eurorack
 rig — see the guide for what the defaults assume.
 
-> **There is no undo yet.** Clear is immediate and unrecoverable; regenerating
-> with `E(k,n)` is the way back. The brief lists undo as a recommended control,
-> and this is the first feature that really wants it.
+> **Every generate and every Clear is recoverable.** Each track keeps a short
+> history of its steps — step through it with the `‹ 3/7 ›` control beside the
+> generate button. What is *not* recorded is editing: step toggles and loop-length
+> changes are live, so stepping through versions will replace them.
 
 **Doesn't:**
 
