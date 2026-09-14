@@ -1,0 +1,10 @@
+{
+  "name": "gr00ve",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Generative multi-track sequencer — algorithmic melody generation driven by sliders and encoders.",
+  "packageManager": "pnpm@11.27.0",
+  "engines": {
+    "node": ">=24"
+  }
+}

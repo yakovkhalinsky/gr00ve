@@ -1,0 +1,17 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.vite/
+coverage/
+
+# Editor / OS noise
+.DS_Store
+*.swp
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Local env
+.env
+.env.local
+*.local

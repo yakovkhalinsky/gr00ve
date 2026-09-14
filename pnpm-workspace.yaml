@@ -1,0 +1,9 @@
+# pnpm workspace root.
+#
+# Any directory matched here that contains a package.json is a workspace
+# package; directories without one are skipped harmlessly, so the globs can
+# stay broad.
+
+packages:
+  - apps/*
+  - packages/*

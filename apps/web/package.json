@@ -1,0 +1,33 @@
+{
+  "name": "@gr00ve/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The sequencer UI — React 19 + Vite. Targets Chrome.",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -p .",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@gr00ve/audio": "workspace:*",
+    "@gr00ve/core": "workspace:*",
+    "@gr00ve/midi": "workspace:*",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.4",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0"
+  }
+}

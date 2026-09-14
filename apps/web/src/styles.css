@@ -1,0 +1,132 @@
+/* Deliberately plain. The interaction rules matter more than the styling, and
+ * the ones encoded here are the researched ones:
+ *   - 44px minimum touch targets (WCAG 2.5.5). Below ~24px a performer
+ *     thumb-drumming misses about a quarter of their taps.
+ *   - A visible downbeat every 4 steps so the grid is readable without counting.
+ *   - Distinct, stable colours: an LED or a step means one thing and keeps
+ *     meaning it. Multiplexed colour meaning is the recurring hardware failure.
+ */
+
+:root {
+  --bg: #101014;
+  --panel: #191920;
+  --panel-2: #22222c;
+  --line: #2f2f3a;
+  --text: #e7e7ef;
+  --muted: #9a9aa8;
+  --accent: #5b8cf5;
+  --accent-hot: #e6603c;
+  --on: #3f6fd8;
+  --step: 44px;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.45 ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+.rack {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 20px;
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.transport {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  flex-wrap: wrap;
+  padding: 14px 18px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.transport__play {
+  min-height: var(--step);
+  min-width: 88px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.transport__play[aria-pressed='true'] { background: var(--accent); border-color: var(--accent); }
+
+.transport__scale { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+.transport__scale label { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: 12px; }
+.transport__scale select { min-height: 36px; padding: 0 8px; background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; }
+.transport__root { font-variant-numeric: tabular-nums; color: var(--muted); }
+
+/* --- Knob ---------------------------------------------------------------- */
+
+.knob { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.knob__dial { touch-action: none; cursor: grab; border-radius: 50%; }
+.knob__dial:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.knob__dial.is-dragging { cursor: grabbing; }
+.knob__track { fill: var(--panel-2); stroke: var(--line); stroke-width: 2; }
+.knob__arc { fill: none; stroke: var(--accent); stroke-width: 3; stroke-linecap: round; }
+.knob__pointer { stroke: var(--text); stroke-width: 3; stroke-linecap: round; }
+.knob__label { font-size: 11px; color: var(--muted); }
+.knob__value { font-size: 11px; color: var(--text); font-variant-numeric: tabular-nums; }
+.knob__input { width: 60px; background: var(--panel-2); color: var(--text); border: 1px solid var(--accent); border-radius: 4px; }
+
+/* --- Pitch probability mixer --------------------------------------------- */
+
+.mixer { padding: 14px 18px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+.mixer__title, .generator__title { margin: 0 0 4px; font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.mixer__hint, .generator__hint { margin: 0 0 12px; font-size: 12px; color: var(--muted); max-width: 62ch; }
+.mixer__faders { display: flex; gap: 10px; flex-wrap: wrap; }
+.fader { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.fader__input { writing-mode: vertical-lr; direction: rtl; width: 28px; height: 110px; accent-color: var(--accent); }
+.fader__label { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* --- Tracks -------------------------------------------------------------- */
+
+.tracks { display: flex; flex-direction: column; gap: 8px; }
+.track { display: flex; align-items: center; gap: 14px; padding: 10px 14px; background: var(--panel); border: 1px solid var(--line); border-left: 3px solid transparent; border-radius: 10px; }
+.track.is-selected { border-left-color: var(--accent); }
+.track__head { display: flex; align-items: center; gap: 10px; min-width: 290px; }
+.track__name { min-height: 32px; padding: 0 10px; background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
+.track__name[aria-pressed='true'] { border-color: var(--accent); }
+.track__mute, .track__euclid { min-height: 32px; padding: 0 10px; background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; cursor: pointer; font-size: 12px; }
+.track__mute[aria-pressed='true'] { background: var(--accent-hot); border-color: var(--accent-hot); }
+
+/* --- Step grid ----------------------------------------------------------- */
+
+.steps__row { display: flex; gap: 4px; }
+.step {
+  width: var(--step);
+  height: var(--step);
+  padding: 0;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  cursor: pointer;
+}
+/* A quieter downbeat every 4 steps — readability without counting. */
+.step[data-beat='downbeat'] { border-color: #3d3d4c; }
+.step.is-on { background: var(--on); border-color: var(--on); }
+.step.is-accent { background: var(--accent-hot); border-color: var(--accent-hot); }
+.step.is-playing { outline: 2px solid var(--text); outline-offset: 1px; }
+.step:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* --- Generator ----------------------------------------------------------- */
+
+.generator { display: flex; align-items: center; gap: 22px; padding: 14px 18px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+.generator__title, .generator__hint { margin: 0; }
+.generator__hint { flex: 1; max-width: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}

@@ -1,0 +1,75 @@
+name: Deploy to GitHub Pages
+
+# Builds the web app and publishes it to GitHub Pages.
+#
+# Note this workflow file requires the `workflow` token scope to push. If
+# `git push` rejects it with "refusing to allow a Personal Access Token to
+# create or update workflow", run:
+#
+#   gh auth refresh -s workflow
+#
+# Pages must also be set to deploy from GitHub Actions rather than from a
+# branch — otherwise the artifact is uploaded but never served:
+#
+#   gh api -X POST repos/yakovkhalinsky/gr00ve/pages \
+#     -f 'source[branch]=main' -f 'source[path]=/' 2>/dev/null || \
+#   gh api -X PUT repos/yakovkhalinsky/gr00ve/pages -f build_type=workflow
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Let an in-flight deploy finish rather than cancelling it mid-publish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Reads the version pinned by `packageManager` in package.json, so CI and
+      # local development cannot drift apart.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      # --frozen-lockfile so a stale pnpm-lock.yaml fails loudly rather than
+      # silently resolving something different from what was tested.
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # The whole test suite runs before the build: there is no point
+      # publishing a broken bundle, and it costs a few seconds.
+      - name: Test
+        run: pnpm -r test
+
+      - name: Build web app
+        run: pnpm --filter @gr00ve/web build
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

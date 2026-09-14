@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "NodeNext",
+    "moduleResolution": "nodenext",
+
+    // Node 24 runs .ts files directly by stripping types, so imports keep their
+    // .ts extension at runtime and tsc rewrites them to .js on emit.
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "exactOptionalPropertyTypes": true,
+
+    // This config only type-checks, including the test files.
+    // tsconfig.build.json extends it to emit, and excludes the tests.
+    "noEmit": true,
+    "types": ["node"],
+    "skipLibCheck": true
+  },
+  "include": ["src"]
+}

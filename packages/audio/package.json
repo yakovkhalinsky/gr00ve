@@ -1,0 +1,25 @@
+{
+  "name": "@gr00ve/audio",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Scheduling, transport and playback — everything that touches Web Audio.",
+  "engines": {
+    "node": ">=24"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p .",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@gr00ve/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.4",
+    "typescript": "^7.0.2"
+  }
+}

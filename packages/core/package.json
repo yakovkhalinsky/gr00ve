@@ -1,0 +1,22 @@
+{
+  "name": "@gr00ve/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Pure generation and pattern logic — no DOM, no audio, fully unit-testable.",
+  "engines": {
+    "node": ">=24"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p .",
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.4",
+    "typescript": "^7.0.2"
+  }
+}
