@@ -1,0 +1,214 @@
+# Using gr00ve
+
+A generative multi-track sequencer. You set up *rules* — a rhythm, a pool of
+pitches, a register — and it plays something; you steer it while it runs.
+
+Live at **<https://yakov.khalinsky.com/gr00ve/>**. Use that **https** address:
+the `github.io` one redirects over plain `http`, and Web MIDI needs a secure
+context, so arriving that way would silently disable MIDI.
+
+Targets **Chrome** (or another Chromium browser). There is no Safari or iOS
+support, and there never will be — no browser on those platforms implements
+Web MIDI.
+
+---
+
+## Getting started
+
+1. Open the page.
+2. Press **Play**.
+
+That is genuinely all. The app starts with two melodic tracks and six drum
+tracks already written, so the first click produces music rather than silence.
+
+If you hear nothing, the usual cause is that the browser refused to start audio.
+Press Play again — the context is created inside that click, so a second press
+usually resolves it. Also check the tab isn't muted and the system volume is up.
+
+---
+
+## A five-minute tour
+
+**1. Listen for a minute.** The eight tracks are on loop lengths of 16, 7, 16,
+16, 16, 16, 5 and 7 steps. Because those don't divide into each other, the
+tracks drift against one another and the pattern doesn't repeat for a long time
+— roughly **35 bars** before everything realigns. Watch the white playhead
+outlines: they start together and gradually slide apart. That's the point.
+
+**2. Change the drum kit.** On Track 4 (the snare), use the dropdown under the
+mode button to switch it to **Tom**. Try the others. Each is synthesised live,
+so they respond instantly.
+
+**3. Turn a rhythm track into a melody.** On Track 5 (the hats), click the mode
+button — it reads **Rhythm**. It becomes **Voice**: the track now plays pitched
+notes instead of a drum, using the drum part's rhythm. Click it again to switch
+back. Nothing is lost either way.
+
+**4. Rewrite a track's pitches.** Move some faders in the **Pitch probability**
+panel — these are the twelve notes of the scale, one per semitone from the root.
+Pull one down to zero to remove that note from the pool entirely. Now click
+**E(4,16)** on Track 1 (the bass). Its notes are redrawn from your new weights.
+
+**5. Change the rhythm.** At the bottom of the page, set **Pulses** to `5` and
+**Steps** to `8`. Click **E(5,8)** on Track 6. You've just written a Euclidean
+pattern — five evenly-spread hits in eight steps.
+
+**6. Make it swing.** Drag the **Swing** knob in the transport bar up to about
+`67%`. The off-beats push late into a triplet feel. Note the loop lengths don't
+change — swing redistributes time *within* the bar, it doesn't stretch it, so
+the pattern still realigns at exactly the same moment.
+
+**7. Clear something.** Click **Clear** on Track 3. It empties. There's no undo,
+so get it back with **E(4,16)**.
+
+---
+
+## Reference
+
+### Transport bar
+
+| Control | Range | What it does |
+|---|---|---|
+| **Play / Stop** | — | Starts and stops. Always starts from the top of the pattern. |
+| **Tempo** | 20–300 BPM | Speed. Takes effect from the next step — it won't lurch mid-note. |
+| **Swing** | 0–90% | Delays every *odd* step. **0 is straight and ~67% is a triplet feel** — the knob is zero-based, so it does not follow the convention where 50% is straight. |
+| **Scale** | 10 modes | Which notes pitch generation snaps to. Aeolian, Dorian and Phrygian cover almost all electronic music. |
+| Root note | — | Display only (A2 by default). The scale is built upward from here. |
+
+### Pitch probability
+
+Twelve faders, one per semitone above the root. Each sets **how likely that
+note is** to be chosen when a pattern is generated. Pull one to zero and the
+note is removed from the pool entirely — there's no separate on/off.
+
+This is the panel that decides *what* the generators play. **E(k,n)** decides
+*when*. Changing a fader does nothing until you generate, so nothing you've
+edited by hand gets overwritten underneath you.
+
+Two behaviours worth knowing:
+
+- **Notes are snapped into the scale.** A fader that lands between two scale
+  notes gives you the nearer one, so the twelve faders act as a pool rather than
+  a precise tuning. Weighted a fifth in a minor pentatonic, you'll get whatever
+  in-scale note is closest.
+- **The octave jump is rare by default.** The third octave is deliberately
+  unused, because a wide range makes an electronic lead muddy rather than
+  expressive.
+
+### A track strip
+
+Each of the eight rows is a track. Left to right:
+
+| Control | What it does |
+|---|---|
+| **Track name** | Highlights the row. Currently cosmetic. |
+| **Mute** | Silences the track. Turns orange when engaged. |
+| **Loop** | The track's loop length in steps, **independent** of the pattern. This is the polymeter control. |
+| **Mode (Voice / Rhythm)** | Switches the track between pitched notes and one drum sound. Filled blue in Rhythm mode. |
+| **Drum** | Which drum. Greyed out on a Voice track — but it still shows what the track *would* play if you switched it. |
+| **E(k,n)** | Writes a Euclidean pattern into this track, using the Pulses and Steps from the generator panel at the bottom of the page. |
+| **Clear** | Empties the track's steps. **No undo.** |
+| Step grid | See below. |
+
+**Loop length and pattern length are separate.** Lowering a track's Loop to 5
+doesn't delete any steps — it just reads the first five of them and repeats.
+Raise it again and the rest come back.
+
+### The step grid
+
+Steps wrap into **rows of 8**, so each row is half a bar. Numbers are absolute:
+step 9 is step 9, not "row 2, step 1".
+
+- **Click any step** to toggle it on or off.
+- **Blue** is a note. **Orange** is an accented note — louder, and on a pitched
+  voice brighter too.
+- **White outline** is the playhead, and every track has its own, running at its
+  own loop length. That's why they drift apart.
+- The first cell of each row has a brighter left edge marking the half-bar, and
+  every fourth step is subtly marked as a downbeat.
+
+Hand-placed steps are **unaccented**. Only generated patterns accent their
+downbeats — so if you want accents, generate, then edit around them.
+
+### The generator panel
+
+At the **bottom of the page**. Two knobs:
+
+- **Pulses (k)** — how many hits.
+- **Steps (n)** — how many steps to spread them across.
+
+Then click **E(k,n)** on whichever track you want to write to. The pair are
+parameters for that button, which is why they're easy to miss up there — see
+*Limitations* below.
+
+Euclidean rhythm is the one generator here whose two controls are readable with
+no training: you turn `k` and `n` and hear exactly what they mean. Four-on-the-
+floor is E(4,16); three-against-eight is the tresillo.
+
+**Generation is repeatable.** Clicking E twice with the same settings gives the
+same phrase. Change a pitch fader or `k`/`n` and it gives a different one.
+
+---
+
+## Controls
+
+### Knobs
+
+Knobs are **relative** — grab one and it moves from wherever it already is,
+rather than jumping to your cursor. That's deliberate; jump-on-grab is the most
+common complaint about on-screen knobs.
+
+| Action | Effect |
+|---|---|
+| Drag up/down | Change the value |
+| **Shift** + drag | Fine adjust (10× finer) |
+| **↑ ↓ ← →** | Coarse steps |
+| **Shift** + arrows | Fine steps |
+| **Home / End** | Minimum / maximum |
+| Mouse wheel | One step |
+| **Double-click** | Type an exact value; **Enter** commits, **Esc** cancels |
+
+Every knob is a real focusable control with its value exposed to assistive
+technology, so **Tab** reaches them and a screen reader announces position and
+value.
+
+### Everything else
+
+Step buttons and mode buttons are ordinary buttons — **Tab** to reach them,
+**Space** or **Enter** to activate. Each step's accessible name carries its
+position and state ("Track 1, step 5, on"), so the grid is navigable without
+seeing it.
+
+---
+
+## Limitations
+
+Things that are missing rather than hidden:
+
+- **No undo.** Clear is immediate and unrecoverable. Regenerating with E(k,n) is
+  the way back, which works for generated patterns but not hand-edited ones.
+- **No saving.** A page reload loses everything. There's no export yet either.
+- **The generator panel is below the tracks**, so the `k` and `n` that E(k,n)
+  uses are off-screen when you press it. A layout wart.
+- **No MIDI input yet.** Hardware controller support is written and tested but
+  not connected, so a Launch Control XL 3 won't do anything yet.
+- **Nothing plays external gear.** MIDI output isn't wired.
+- **Track register, drum tuning and pattern rotation aren't exposed.** The
+  engine honours all three — they're seeded per track and audible — but there's
+  no control for them.
+- **Track selection is cosmetic.** Clicking a track name highlights it and does
+  nothing else.
+- **There's only one generator per track**, and it's always Euclidean. The
+  mean-reverting walk, the Turing-machine shift register and the logistic map
+  are all built and tested but not reachable from the interface.
+- **Eight tracks, one pattern.** No song mode or pattern chaining.
+
+---
+
+## Where the design came from
+
+Most of the non-obvious choices — why faders are never remapped, why the mode
+column is a fixed width, why the bass is darker than the lead, why the third
+octave is unused — are argued in **[research-brief.md](research-brief.md)**,
+which documents the research behind the whole project along with what couldn't
+be verified.

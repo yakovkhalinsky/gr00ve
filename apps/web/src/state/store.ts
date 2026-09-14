@@ -119,13 +119,15 @@ export interface Gr00veState {
  * particular patterns demonstrate the features that are hardest to explain in
  * prose: Euclidean rhythm, polymeter, and the voice/rhythm split.
  *
- * The first four tracks are a kit, because eight identical sawtooth voices was
- * never a groove — the genre research is explicit that rhythm and timbre carry
- * the material that pitch carries elsewhere, and a sequencer that cannot be a
- * drum machine is not an electronic music instrument. The last four are melodic
- * and deliberately polymetric: loop lengths 16, 8, 7 and 13 realign only after
- * lcm = 11648 steps, so the line drifts for hundreds of bars from four stored
- * rows.
+ * Two tracks are melodic and six are a kit, because eight identical sawtooth
+ * voices was never a groove — the genre research is explicit that rhythm and
+ * timbre carry the material that pitch carries elsewhere, and a sequencer that
+ * cannot be a drum machine is not an electronic music instrument.
+ *
+ * The whole rack is deliberately polymetric. Loop lengths are 16 and 7 for the
+ * melodic pair and 16, 16, 16, 16, 5 and 7 for the kit, so the composite
+ * realigns only after lcm(16, 7, 5) = 560 steps — about 35 bars of 4/4. The
+ * listener hears composed variation where there are eight stored rows.
  */
 interface SeedSpec {
   readonly pulses: number;

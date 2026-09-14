@@ -9,6 +9,9 @@ is in **[docs/research-brief.md](docs/research-brief.md)**, and it is worth
 reading before changing anything here, because most of the non-obvious decisions
 in this repo come from it.
 
+**Just want to play it?** **[docs/using-gr00ve.md](docs/using-gr00ve.md)** is the
+user guide — a five-minute tour, then a reference for every control.
+
 **Live demo:** <https://yakov.khalinsky.com/gr00ve/>
 
 > Use the **https** URL above. The `github.io` address redirects over plain

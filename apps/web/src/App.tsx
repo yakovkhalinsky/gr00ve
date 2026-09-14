@@ -105,6 +105,18 @@ export function App(): React.JSX.Element {
           </label>
           <span className="transport__root">{noteName(root)}</span>
         </div>
+
+        {/* Links to the rendered markdown on GitHub rather than to the copy in
+          * this deployment — GitHub Pages serves .md as plain text, so a
+          * relative link would show the reader raw source. */}
+        <a
+          className="transport__help"
+          href="https://github.com/yakovkhalinsky/gr00ve/blob/main/docs/using-gr00ve.md"
+          target="_blank"
+          rel="noreferrer"
+        >
+          How to use this
+        </a>
       </header>
 
       <section className="mixer" aria-label="Pitch probability mixer">

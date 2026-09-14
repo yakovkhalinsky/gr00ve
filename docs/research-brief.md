@@ -648,9 +648,13 @@ is untouched.
    and `subscribeTransient` drives `AudioParam`s at pointer rate with zero
    renders. But it is a genuine trade, and worth re-examining if the dependency
    weight becomes annoying.
-3. **Swing semantics.** Currently `swing` is a knob where `2/3` is a triplet
-   feel and the offset is half of it. The alternative is the classic ratio
-   formulation (`0.5` = straight). Worth pinning down before the UI exposes it.
+3. ~~**Swing semantics.**~~ **Settled.** The knob is zero-based: 0 is straight
+   and **2/3 is a triplet**, with the displacement being half the value, so 2/3
+   yields the 1/3-of-a-step offset a triplet needs. Note this is deliberately
+   *not* the convention the research table above uses, where 50% is straight and
+   66.7% is a triplet — the zero-based form is what a UI knob wants, since a
+   performer expects the leftmost position to mean "none". The mismatch is a
+   genuine trap when reading the swing row of §4.2 against the code.
 4. **Whether to add a Launchpad Mini instead of the APC mini mk2.** Both fill
    the step-grid gap; the APC mini mk2 is cheaper and has documented RGB SysEx,
    but Launchpad tooling (`launchpad.py`) is more mature — though it does not

@@ -37,8 +37,17 @@ export interface TransportState {
   /** Usually 16 — i.e. 16th-note steps. */
   readonly stepsPerBeat: number;
   /**
-   * Swing amount, 0..1. 0 is straight, ~0.33 approximates a triplet feel, and
-   * UK garage sits around 0.4–0.6. Applied to odd-numbered steps.
+   * Swing amount, 0..0.9. **0 is straight and 2/3 is a triplet feel.**
+   *
+   * Note this is *not* the other common convention, where 50% is straight and
+   * 66.7% is a triplet. Here the knob is zero-based because that is what a UI
+   * wants, and the displacement it produces is half the value — so 2/3 yields
+   * the 1/3-of-a-step offset a triplet needs. An earlier version of this
+   * comment claimed 0.33 was the triplet figure and contradicted
+   * `swingOffset`'s own documentation three lines below; the code was right and
+   * the comment was wrong.
+   *
+   * Applied to odd-numbered steps.
    */
   readonly swing: number;
   readonly tracks: readonly Track[];
