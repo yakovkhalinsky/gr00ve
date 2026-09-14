@@ -9,9 +9,28 @@ is in **[docs/research-brief.md](docs/research-brief.md)**, and it is worth
 reading before changing anything here, because most of the non-obvious decisions
 in this repo come from it.
 
+**Live demo:** <https://yakov.khalinsky.com/gr00ve/>
+
+> Use the **https** URL above. The `github.io` address redirects over plain
+> `http`, and Web MIDI needs a secure context — so arriving that way would
+> silently disable MIDI. (The domain's HTTPS enforcement is a setting on the
+> user-level Pages site, not this repo.)
+
 **Status: scaffold.** The generation core is real and tested. The audio engine
 and MIDI layers are skeletons with the hard parts researched and documented. The
 UI is functional but not wired to the scheduler.
+
+### What the demo does and doesn't do
+
+**Works:** toggling steps, dragging knobs (relative drag — no jump on grab),
+Shift for fine adjust, arrow keys, double-click to type a value, switching
+scales, the per-track loop length, the 12-fader pitch mixer, and **E(k,n)** —
+click a track's `E(5,8)` button to write a Euclidean pattern into it.
+
+**Doesn't:** **Play does nothing.** There is no audio engine wired yet, so
+nothing is audible. Playback, MIDI input, and the control-surface LEDs are the
+remaining work; the transport, scheduler and SysEx layers exist and are tested,
+but the glue is not written. See §8 of the brief for exactly what is missing.
 
 ## Quick start
 
