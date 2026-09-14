@@ -105,6 +105,15 @@ body {
 /* Generate and erase stacked as one column. */
 .track__gen { display: flex; flex-direction: column; gap: 4px; }
 
+/* Voice / rhythm mode, plus the drum picker when in rhythm mode. */
+.track__inst { display: flex; flex-direction: column; gap: 4px; }
+.track__kind { min-height: 32px; padding: 0 10px; background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; cursor: pointer; font-size: 12px; }
+/* Rhythm mode is filled, not merely outlined — the mode has to be readable at
+ * a glance down a column of eight tracks, and per the research a control whose
+ * current meaning is not visible is where multiplexed interfaces go wrong. */
+.track__kind[data-kind='rhythm'] { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.track__drum { min-height: 28px; padding: 0 6px; background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; font-size: 12px; }
+
 /* Clear is destructive and there is no undo yet, so it sits visually quieter
  * than the generate button — it should be findable, not inviting. */
 .track__clear { color: var(--muted); }

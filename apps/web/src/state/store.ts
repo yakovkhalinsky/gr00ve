@@ -1,8 +1,8 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import {
-  DEFAULT_MIX, euclid, grid, degreeToPitch,
-  type PitchMix, type ScaleName, type Step, type StepGrid as Cells,
+  DEFAULT_MIX, DEFAULT_KIT, euclid, grid, degreeToPitch,
+  type DrumType, type PitchMix, type ScaleName, type Step, type StepGrid as Cells, type TrackKind,
 } from '@gr00ve/core';
 
 /**
@@ -38,6 +38,16 @@ export interface TrackState {
   readonly length: number;
   readonly mute: boolean;
   readonly solo: boolean;
+  /**
+   * Whether this track plays pitched notes or one percussion sound.
+   *
+   * On a `'rhythm'` track the steps' `pitch` values are ignored — the track
+   * already fixes which drum it plays — but they are preserved rather than
+   * cleared, so switching back to `'voice'` restores the melody.
+   */
+  readonly kind: TrackKind;
+  /** Which drum, when `kind` is `'rhythm'`. */
+  readonly drum: DrumType;
 }
 
 export interface Gr00veState {
@@ -71,6 +81,8 @@ export interface Gr00veState {
   toggleMute: (trackIndex: number) => void;
   euclidize: (trackIndex: number, pulses: number, steps: number) => void;
   clearTrack: (trackIndex: number) => void;
+  setTrackKind: (trackIndex: number, kind: TrackKind) => void;
+  setDrum: (trackIndex: number, drum: DrumType) => void;
 }
 
 /**
@@ -79,22 +91,36 @@ export interface Gr00veState {
  * The app ships *playing something* rather than an empty grid, for two reasons.
  * An empty sequencer with a Play button gives no signal about whether playback
  * works — the first click produces silence and reads as broken. And these
- * particular patterns demonstrate the two features that are hardest to explain
- * in prose: Euclidean rhythm, and polymeter.
+ * particular patterns demonstrate the features that are hardest to explain in
+ * prose: Euclidean rhythm, polymeter, and the voice/rhythm split.
  *
- * The loop lengths are deliberately coprime-ish (16, 16, 8, 5, 16, 7, 13, 16).
- * lcm(16, 8, 5, 7, 13) = 7280 steps, so the eight tracks realign roughly every
- * 455 bars — the pattern evolves instead of looping, from 8 stored rows.
+ * The first four tracks are a kit, because eight identical sawtooth voices was
+ * never a groove — the genre research is explicit that rhythm and timbre carry
+ * the material that pitch carries elsewhere, and a sequencer that cannot be a
+ * drum machine is not an electronic music instrument. The last four are melodic
+ * and deliberately polymetric: loop lengths 16, 8, 7 and 13 realign only after
+ * lcm = 11648 steps, so the line drifts for hundreds of bars from four stored
+ * rows.
  */
-const SEED: readonly { pulses: number; steps: number; degree: number }[] = [
-  { pulses: 4, steps: 16, degree: -7 }, // root down an octave: the bass
-  { pulses: 5, steps: 16, degree: 0 },
-  { pulses: 3, steps: 8, degree: 2 },
-  { pulses: 2, steps: 5, degree: 4 },
-  { pulses: 7, steps: 16, degree: 5 },
-  { pulses: 3, steps: 7, degree: 7 },
-  { pulses: 5, steps: 13, degree: 9 },
-  { pulses: 6, steps: 16, degree: 12 },
+interface SeedSpec {
+  readonly pulses: number;
+  readonly steps: number;
+  readonly degree: number;
+  readonly kind: TrackKind;
+  readonly drum: DrumType;
+}
+
+const SEED: readonly SeedSpec[] = [
+  // The kit. E(4,16) is four-on-the-floor; E(8,16) is eighth-note hats.
+  { pulses: 4, steps: 16, degree: 0, kind: 'rhythm', drum: 'kick' },
+  { pulses: 3, steps: 16, degree: 0, kind: 'rhythm', drum: 'clap' },
+  { pulses: 8, steps: 16, degree: 0, kind: 'rhythm', drum: 'hat' },
+  { pulses: 5, steps: 16, degree: 0, kind: 'rhythm', drum: 'rim' },
+  // Melodic, and polymetric against the kit.
+  { pulses: 4, steps: 16, degree: -7, kind: 'voice', drum: 'kick' }, // bass, an octave down
+  { pulses: 5, steps: 8, degree: 0, kind: 'voice', drum: 'kick' },
+  { pulses: 3, steps: 7, degree: 5, kind: 'voice', drum: 'kick' },
+  { pulses: 5, steps: 13, degree: 9, kind: 'voice', drum: 'kick' },
 ];
 
 /** Build a grid from a Euclidean mask — the rhythmic spine of a track. */
@@ -124,7 +150,9 @@ export function euclidCells(
 }
 
 function seedTrack(index: number, root: number, scale: ScaleName): TrackState {
-  const pattern = SEED[index % SEED.length] ?? { pulses: 4, steps: 16, degree: 0 };
+  const pattern: SeedSpec = SEED[index % SEED.length] ?? {
+    pulses: 4, steps: 16, degree: 0, kind: 'voice', drum: 'kick',
+  };
   return {
     id: `track-${index + 1}`,
     name: `Track ${index + 1}`,
@@ -134,6 +162,8 @@ function seedTrack(index: number, root: number, scale: ScaleName): TrackState {
     length: pattern.steps,
     mute: false,
     solo: false,
+    kind: pattern.kind,
+    drum: pattern.drum ?? DEFAULT_KIT[index % DEFAULT_KIT.length] ?? 'kick',
   };
 }
 
@@ -207,6 +237,24 @@ export const useGr00ve = create<Gr00veState>()(
       const tracks = get().tracks.map((t, i) =>
         i === trackIndex ? { ...t, cells: new Array<Step | null>(t.cells.length).fill(null) } : t,
       );
+      set({ tracks });
+    },
+
+    /**
+     * Switch a track between pitched and percussive.
+     *
+     * Only `kind` changes. The steps keep their pitches, so switching a rhythm
+     * track back to a voice returns the melody rather than an empty grid — and
+     * switching a melodic track to rhythm makes it a drum part of the same
+     * rhythm without losing anything.
+     */
+    setTrackKind: (trackIndex, kind) => {
+      const tracks = get().tracks.map((t, i) => (i === trackIndex ? { ...t, kind } : t));
+      set({ tracks });
+    },
+
+    setDrum: (trackIndex, drum) => {
+      const tracks = get().tracks.map((t, i) => (i === trackIndex ? { ...t, drum } : t));
       set({ tracks });
     },
   })),

@@ -15,6 +15,7 @@ export * as fraction from './pattern/fraction.ts';
 export type { Fraction } from './pattern/fraction.ts';
 
 export * from './pattern/step.ts';
+export * from './pattern/track.ts';
 export * from './theory/scale.ts';
 export * from './gen/rng.ts';
 export * from './gen/euclid.ts';

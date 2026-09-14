@@ -14,7 +14,9 @@
 export * from './scheduler.ts';
 export * from './timeline.ts';
 export * from './transport.ts';
+export * from './instrument.ts';
 export * from './voice.ts';
+export * from './drums.ts';
 export * from './engine.ts';
 
 // Not yet built, and deliberately so:
@@ -24,6 +26,10 @@ export * from './engine.ts';
 //     source of the classic screaming acid line. `Voice` raises level and
 //     cutoff on accent but does not model that accumulation. It is the single
 //     highest-value next addition to the voice.
+//   - **Per-track drum tuning.** `DrumParams` carries `tune` and `decay`
+//     multipliers, and `DrumVoice` honours both, but nothing in the UI exposes
+//     them — every drum currently plays at its designed tuning. Wiring two
+//     encoders per rhythm track is the obvious next step.
 //   - **A polyphonic allocator.** Tracks are monophonic, which is right for
 //     melodic lines and matches the 303. If a track ever needs chords, note
 //     that the slide rule breaks naive allocators that track one `prev_note`:

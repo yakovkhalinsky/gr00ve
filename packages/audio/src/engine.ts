@@ -1,5 +1,6 @@
 /**
- * The playback engine: one AudioContext, one voice per track, one scheduler.
+ * The playback engine: one AudioContext, one instrument per track, one
+ * scheduler.
  *
  * Structure follows the research recommendations directly:
  *
@@ -9,9 +10,13 @@
  *   - **No audio framework.** Plain Web Audio nodes; the timing is ours.
  *   - **Master limiting.** Eight simultaneous voices with resonant filters will
  *     clip, and a compressor is cheaper than carefully budgeting every gain.
- *   - **`setTargetAtTime`/ramps rather than `value =`** throughout the voice,
+ *   - **`setTargetAtTime`/ramps rather than `value =`** throughout the voices,
  *     because assigning `AudioParam.value` produces a discontinuity — an
  *     audible click on every note.
+ *
+ * Each track holds either a pitched `Voice` or a `DrumVoice`, chosen by the
+ * track's `kind`. The engine does not branch per step: both satisfy
+ * `Instrument`, and a drum simply ignores the frequency and glide it is passed.
  *
  * Playhead correctness is worth calling out. The scheduler runs ~100ms ahead,
  * so notifying the UI at *schedule* time makes the playhead visibly lead the
@@ -19,23 +24,33 @@
  * released to the UI only when the audio clock actually reaches them.
  */
 
+import type { DrumType, TrackKind } from '@gr00ve/core';
+
+import { DrumVoice, DRUM_DEFAULTS } from './drums.ts';
+import type { Instrument } from './instrument.ts';
 import { Scheduler } from './scheduler.ts';
 import { collectDueSteps, stepDuration, stepsDueForDisplay, type Cursor, type Tempo } from './timeline.ts';
 import { isAudible, trackStep, type Track } from './transport.ts';
 import { DEFAULT_VOICE, Voice, midiToFreq, type VoiceParams } from './voice.ts';
 
+/** A track as the engine sees it: transport concerns plus an instrument. */
+export interface EngineTrack extends Track {
+  readonly kind: TrackKind;
+  readonly drum: DrumType;
+  /** Melodic parameters, used when `kind` is `'voice'`. */
+  readonly voice?: VoiceParams | undefined;
+}
+
 export interface EngineState {
   readonly bpm: number;
   readonly stepsPerBeat: number;
   readonly swing: number;
-  readonly tracks: readonly Track[];
+  readonly tracks: readonly EngineTrack[];
 }
 
 export interface EngineOptions {
   readonly lookaheadMs?: number;
   readonly intervalMs?: number;
-  /** Index-matched to tracks. Missing entries fall back to the 303-ish default. */
-  readonly voiceParams?: readonly (VoiceParams | undefined)[];
   /**
    * Called when a step actually becomes audible.
    *
@@ -46,6 +61,9 @@ export interface EngineOptions {
   readonly onStep?: (globalStep: number) => void;
 }
 
+/** How long to wait before tearing down a swapped-out instrument. */
+const SWAP_GRACE_MS = 400;
+
 export class SequencerEngine {
   private readonly ctx: AudioContext;
   private readonly master: GainNode;
@@ -53,7 +71,13 @@ export class SequencerEngine {
   private readonly getState: () => EngineState;
   private readonly options: EngineOptions;
 
-  private readonly voices = new Map<number, Voice>();
+  /**
+   * Live instruments by track index, each tagged with the spec it was built
+   * for. The tag is how a kind or drum change is detected — without it, a track
+   * switched from voice to rhythm would keep playing the old sound.
+   */
+  private readonly instruments = new Map<number, { spec: string; instrument: Instrument }>();
+
   private cursor: Cursor = { step: 0, time: 0 };
   private uiQueue: readonly { step: number; time: number }[] = [];
   private raf: number | undefined;
@@ -128,7 +152,7 @@ export class SequencerEngine {
     }
 
     const now = this.ctx.currentTime;
-    for (const voice of this.voices.values()) voice.release(now);
+    for (const { instrument } of this.instruments.values()) instrument.release(now);
 
     this.uiQueue = [];
     this.pendingSlide = [];
@@ -137,8 +161,8 @@ export class SequencerEngine {
 
   dispose(): void {
     this.stop();
-    for (const voice of this.voices.values()) voice.dispose();
-    this.voices.clear();
+    for (const { instrument } of this.instruments.values()) instrument.dispose();
+    this.instruments.clear();
     void this.ctx.close();
   }
 
@@ -167,7 +191,7 @@ export class SequencerEngine {
       if (this.pendingSlide[i] === undefined) this.pendingSlide[i] = false;
 
       const cell = track.grid[trackStep(track, globalStep)] ?? null;
-      const voice = this.voiceFor(i);
+      const instrument = this.instrumentFor(i, track);
 
       if (cell === null) {
         // A rest clears the slide flag. On the hardware the flag does not
@@ -177,25 +201,43 @@ export class SequencerEngine {
       }
 
       // Consume the *previous* step's flag: slide belongs to the note being
-      // glided into, not to the note that carries the flag.
-      const glide = this.pendingSlide[i] === true && voice.isSoundingAt(time);
+      // glided into, not to the note that carries the flag. A drum reports
+      // itself as never sounding, so a slide on a rhythm track is inert
+      // without the engine having to special-case it.
+      const glide = this.pendingSlide[i] === true && instrument.isSoundingAt(time);
 
       // A slide ties into the following step, so its gate must not close early.
       const gate = cell.slide ? 1 : Math.max(0.01, cell.gate);
-      voice.noteOn(time, midiToFreq(cell.pitch), gate * duration, cell.accent, glide);
+      instrument.noteOn(time, midiToFreq(cell.pitch), gate * duration, cell.accent, glide);
 
       this.pendingSlide[i] = cell.slide;
     });
   }
 
-  private voiceFor(index: number): Voice {
-    let voice = this.voices.get(index);
-    if (!voice) {
-      const params = this.options.voiceParams?.[index] ?? DEFAULT_VOICE;
-      voice = new Voice(this.ctx, this.master, params);
-      this.voices.set(index, voice);
+  /**
+   * The instrument for a track, rebuilt when its kind or drum changes.
+   *
+   * A swapped-out instrument is released and then torn down on a timer rather
+   * than immediately: disconnecting nodes that are still ringing would cut them
+   * mid-waveform, which is an audible click on a deliberate user action.
+   */
+  private instrumentFor(index: number, track: EngineTrack): Instrument {
+    const spec = track.kind === 'rhythm' ? `rhythm:${track.drum}` : `voice:${index}`;
+    const existing = this.instruments.get(index);
+    if (existing && existing.spec === spec) return existing.instrument;
+
+    if (existing) {
+      const retired = existing.instrument;
+      retired.release(this.ctx.currentTime);
+      setTimeout(() => retired.dispose(), SWAP_GRACE_MS);
     }
-    return voice;
+
+    const instrument: Instrument = track.kind === 'rhythm'
+      ? new DrumVoice(this.ctx, this.master, DRUM_DEFAULTS[track.drum])
+      : new Voice(this.ctx, this.master, track.voice ?? DEFAULT_VOICE);
+
+    this.instruments.set(index, { spec, instrument });
+    return instrument;
   }
 
   /** Release due steps to the UI. Runs on rAF, so ~60Hz granularity. */

@@ -22,6 +22,8 @@
  * `noteOn` takes a `glide` flag rather than the voice reading its own `slide`.
  */
 
+import type { Instrument } from './instrument.ts';
+
 export interface VoiceParams {
   readonly waveform: OscillatorType;
   /** Resting filter cutoff, Hz. The acid sweep lives here. */
@@ -75,7 +77,7 @@ export function midiToFreq(midi: number): number {
   return 440 * 2 ** ((midi - 69) / 12);
 }
 
-export class Voice {
+export class Voice implements Instrument {
   private readonly ctx: BaseAudioContext;
   private readonly params: VoiceParams;
   private readonly osc: OscillatorNode;

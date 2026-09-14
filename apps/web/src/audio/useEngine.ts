@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 
 import {
   DEFAULT_VOICE, SequencerEngine,
-  type EngineState, type Track, type VoiceParams,
+  type EngineState, type EngineTrack, type VoiceParams,
 } from '@gr00ve/audio';
 
 import { useGr00ve, type TrackState } from '../state/store.ts';
@@ -24,8 +24,12 @@ import { useGr00ve, type TrackState } from '../state/store.ts';
  * store.
  */
 
-/** The engine's view of a track. `cells` is the UI's name for the same thing. */
-function toEngineTrack(track: TrackState): Track {
+/**
+ * The engine's view of a track. `cells` is the UI's name for the same thing,
+ * and `voice` is attached here rather than passed as a parallel array so that
+ * a track carries everything needed to sound it.
+ */
+function toEngineTrack(track: TrackState, index: number): EngineTrack {
   return {
     id: track.id,
     name: track.name,
@@ -33,6 +37,9 @@ function toEngineTrack(track: TrackState): Track {
     length: track.length,
     mute: track.mute,
     solo: track.solo,
+    kind: track.kind,
+    drum: track.drum,
+    voice: trackVoice(index),
   };
 }
 
@@ -66,8 +73,6 @@ export function trackVoice(index: number): VoiceParams {
   };
 }
 
-const VOICES: readonly VoiceParams[] = Array.from({ length: 8 }, (_, i) => trackVoice(i));
-
 export interface EngineHandle {
   /** Start or stop. Call from a click handler — see the note above. */
   readonly toggle: () => void;
@@ -83,7 +88,6 @@ export function useEngine(): EngineHandle {
     let engine = engineRef.current;
     if (!engine) {
       engine = new SequencerEngine(currentEngineState, {
-        voiceParams: VOICES,
         onStep: (globalStep) => useGr00ve.getState().setGlobalStep(globalStep),
       });
       engineRef.current = engine;

@@ -157,3 +157,79 @@ test('clearTrack does not mutate the previous state array', () => {
   assert.notEqual(s().tracks, before, 'state array was mutated in place');
   assert.ok(beforeCells?.some((c) => c !== null), 'previous cells were mutated');
 });
+
+// --- voice / rhythm ---------------------------------------------------------
+
+test('the seed ships a kit and some melodic tracks', () => {
+  // A default of eight identical pitched voices was never a groove, and it
+  // gave no hint that the voice/rhythm split exists.
+  const kinds = s().tracks.map((t) => t.kind);
+  assert.ok(kinds.includes('rhythm'), 'expected some rhythm tracks in the seed');
+  assert.ok(kinds.includes('voice'), 'expected some voice tracks in the seed');
+});
+
+test('setTrackKind changes only the chosen track', () => {
+  s().setTrackKind(0, 'voice');
+  s().setTrackKind(0, 'rhythm');
+  const sibling = s().tracks[1];
+
+  s().setTrackKind(0, 'voice');
+
+  assert.equal(s().tracks[0]?.kind, 'voice');
+  assert.equal(s().tracks[1], sibling, 'sibling track was rebuilt');
+  assert.equal(s().tracks.length, 8);
+});
+
+test('setTrackKind preserves the steps, so switching back restores the melody', () => {
+  // The important property. Clearing the pitches on a switch to rhythm would
+  // make the mode toggle silently destructive, and a performer flipping to
+  // rhythm to hear a part as drums would lose the part.
+  s().euclidize(2, 5, 16);
+  const asVoice = s().tracks[2];
+  assert.ok(asVoice?.cells.some((c) => c !== null));
+
+  s().setTrackKind(2, 'rhythm');
+  assert.deepEqual(s().tracks[2]?.cells, asVoice?.cells, 'cells changed on switch to rhythm');
+
+  s().setTrackKind(2, 'voice');
+  assert.deepEqual(s().tracks[2]?.cells, asVoice?.cells, 'cells changed on switch back');
+  assert.equal(s().tracks[2]?.length, asVoice?.length);
+});
+
+test('setTrackKind leaves mute and drum untouched', () => {
+  s().setDrum(3, 'tom');
+  s().toggleMute(3);
+  s().setTrackKind(3, 'voice');
+
+  assert.equal(s().tracks[3]?.drum, 'tom', 'drum should survive a kind change');
+  assert.equal(s().tracks[3]?.mute, true, 'mute should survive a kind change');
+});
+
+test('setDrum changes only the chosen track', () => {
+  const sibling = s().tracks[5];
+  s().setDrum(4, 'rim');
+
+  assert.equal(s().tracks[4]?.drum, 'rim');
+  assert.equal(s().tracks[5], sibling, 'sibling track was rebuilt');
+});
+
+test('setDrum does not disturb the steps', () => {
+  s().euclidize(4, 5, 16);
+  const cells = s().tracks[4]?.cells;
+  s().setDrum(4, 'clap');
+  assert.deepEqual(s().tracks[4]?.cells, cells);
+  assert.equal(s().tracks[4]?.drum, 'clap');
+});
+
+test('kind and drum are independent axes', () => {
+  // A voice track still carries a drum, so switching it to rhythm lands on a
+  // chosen sound rather than an arbitrary one.
+  s().setDrum(7, 'snare');
+  s().setTrackKind(7, 'voice');
+  assert.equal(s().tracks[7]?.kind, 'voice');
+  assert.equal(s().tracks[7]?.drum, 'snare');
+
+  s().setTrackKind(7, 'rhythm');
+  assert.equal(s().tracks[7]?.kind, 'rhythm');
+  assert.equal(s().tracks[7]?.drum, 'snare');
+});

@@ -1,6 +1,9 @@
 import { useState } from 'react';
 
-import { SCALE_LABELS, SCALE_NAMES, noteName, withWeight, type ScaleName } from '@gr00ve/core';
+import {
+  DRUM_LABELS, DRUM_TYPES, SCALE_LABELS, SCALE_NAMES, noteName, withWeight,
+  type DrumType, type ScaleName,
+} from '@gr00ve/core';
 import { trackStep } from '@gr00ve/audio';
 import { useGr00ve, type TrackState } from './state/store.ts';
 import { useEngine } from './audio/useEngine.ts';
@@ -61,6 +64,8 @@ export function App(): React.JSX.Element {
   const toggleMute = useGr00ve((s) => s.toggleMute);
   const euclidize = useGr00ve((s) => s.euclidize);
   const clearTrack = useGr00ve((s) => s.clearTrack);
+  const setTrackKind = useGr00ve((s) => s.setTrackKind);
+  const setDrum = useGr00ve((s) => s.setDrum);
 
   // Local generator controls, pending a proper "generator per track" model.
   const [pulses, setPulses] = useState(5);
@@ -160,6 +165,40 @@ export function App(): React.JSX.Element {
                 onChange={(v) => setTrackLength(i, v)}
                 format={(v) => `${Math.round(v)}`}
               />
+              {/* Voice / Rhythm. A single mode button rather than a segmented
+                * pair, to keep the strip narrow — and because the accessible
+                * name is built to *start with* the visible label, so
+                * label-in-name holds even though the label changes. A static
+                * aria-label over changing text would not. */}
+              <div className="track__inst">
+                <button
+                  type="button"
+                  className="track__kind"
+                  data-kind={track.kind}
+                  aria-label={
+                    track.kind === 'rhythm'
+                      ? `Rhythm mode. Switch ${track.name} to a pitched voice.`
+                      : `Voice mode. Switch ${track.name} to a drum.`
+                  }
+                  onClick={() => setTrackKind(i, track.kind === 'rhythm' ? 'voice' : 'rhythm')}
+                >
+                  {track.kind === 'rhythm' ? 'Rhythm' : 'Voice'}
+                </button>
+                {/* Only shown for rhythm tracks, so voice strips stay narrow. */}
+                {track.kind === 'rhythm' && (
+                  <select
+                    className="track__drum"
+                    value={track.drum}
+                    aria-label={`${track.name} drum sound`}
+                    onChange={(e) => setDrum(i, e.target.value as DrumType)}
+                  >
+                    {DRUM_TYPES.map((drum) => (
+                      <option key={drum} value={drum}>{DRUM_LABELS[drum]}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
               {/* Euclid and Clear are stacked in one column so the
                 * generate/erase pair reads as a unit, and so a track strip
                 * stays narrow enough for several tracks to fit on screen. */}

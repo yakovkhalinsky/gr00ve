@@ -22,13 +22,13 @@ bound to the UI.
 
 ### What the demo does and doesn't do
 
-**Works:** **Play.** Eight tracks of Euclidean patterns that drift against each
-other (loop lengths 16/16/8/5/16/7/13/16, so they realign roughly every 455
-bars). Plus toggling steps, dragging knobs (relative drag — no jump on grab),
-Shift for fine adjust, arrow keys, double-click to type a value, switching
-scales, per-track loop length, the 12-fader pitch mixer, and **E(k,n)** — click
-a track's `E(5,8)` button to write a Euclidean pattern into it. Underneath it,
-**Clear** empties that track's steps.
+**Works:** **Play.** The first four tracks are a drum kit, the last four are
+melodic and polymetric against it. Plus **voice/rhythm** switching, toggling
+steps, dragging knobs (relative drag — no jump on grab), Shift for fine adjust,
+arrow keys, double-click to type a value, switching scales, per-track loop
+length, the 12-fader pitch mixer, and **E(k,n)** — click a track's `E(5,8)`
+button to write a Euclidean pattern into it. Underneath it, **Clear** empties
+that track's steps.
 
 > **There is no undo yet.** Clear is immediate and unrecoverable; regenerating
 > with `E(k,n)` is the way back. The brief lists undo as a recommended control,
@@ -39,12 +39,37 @@ a track's `E(5,8)` button to write a Euclidean pattern into it. Underneath it,
 - **No MIDI input yet.** The mapping semantics (encoder relative modes, fader
   pickup) and the Launch Control XL 3 / APC mini mk2 SysEx are implemented and
   tested in `@gr00ve/midi`, but nothing is bound to the UI.
-- **All eight tracks share one voice shape**, differentiated only by register
-  and filter. Per-track instrument design is a taste decision, and a
-  generator-per-track model is the next real step the brief argues for.
+- **Drum tuning isn't exposed.** `DrumParams` carries `tune` and `decay`
+  multipliers and `DrumVoice` honours both, but every drum plays at its designed
+  tuning — two encoders per rhythm track is the obvious next step.
+- **The pitch mixer isn't wired to generation.** The 12 faders hold state and
+  the generators exist, but the two are not connected yet: `E(k,n)` builds its
+  pitches from the scale, not from the fader weights.
 - **Resonance-coupled accent is not modelled** — see the note in
   `packages/audio/src/index.ts`. It is the highest-value next addition to the
   voice.
+
+### Voice and rhythm tracks
+
+A track is either a **voice** (pitched, drawing notes from the scale) or a
+**rhythm** (unpitched, playing one percussion sound per step). Switch with the
+mode button; rhythm tracks also get a drum picker.
+
+Two properties worth preserving if you change this:
+
+- **The step's `pitch` is ignored on a rhythm track but not cleared.** Switching
+  a track to rhythm and back returns the melody rather than an empty grid — a
+  mode toggle that quietly destroys the part would be a trap.
+- **The engine doesn't branch per step.** Both instruments satisfy `Instrument`,
+  and a drum simply ignores the frequency and glide it's handed. A drum reports
+  `isSoundingAt() === false`, which is what makes a slide on a rhythm track
+  inert without any special-casing.
+
+Drums are **synthesised, not sampled** — a kick is a sine dropping fast from
+150Hz to 45Hz, a snare is noise plus a tuned body, a hat is high-passed noise.
+That's how the 808/909 actually work, so it's recognisable, and it avoids
+shipping or licensing audio files. The noise source is a seeded PRNG rather than
+`Math.random`, so renders are reproducible and therefore testable.
 
 ### How the audio works
 
