@@ -329,26 +329,44 @@ function snapshotOf(track: TrackState): Snapshot {
   return { seed: track.seed, cells: track.cells, length: track.length };
 }
 
+/** Whether a snapshot has anything that will sound. */
+function hasActiveSteps(snapshot: Snapshot): boolean {
+  return snapshot.cells.some((cell) => cell !== null);
+}
+
 /**
  * Record a change to a track's steps, keeping the state it replaces.
  *
- * The subtlety is hand edits. A track's visible cells are not necessarily the
- * version its cursor points at — editing a step leaves the stored version
- * behind, because the store's history is only written by generate and clear.
- * Generating from there and storing only the new pattern would drop the edit
- * out of reach entirely: stepping back would land on the version *before* it
- * and jump straight past.
+ * Two subtleties, both about *not* storing things.
  *
- * Reference equality is enough to detect that, and cheap: every action here
- * builds a new cells array rather than mutating one, so a differing reference
- * means an unrecorded edit.
+ * **An empty pattern is not a version.** It is silence; there is nothing to
+ * come back to, and storing it fills the history with identical all-rest
+ * entries — press Clear three times and the counter climbs for no reason. Both
+ * sides are checked rather than just the incoming state: clearing a track that
+ * had steps still records it, because that is exactly what makes Clear
+ * recoverable, while clearing one that was already empty records nothing.
+ *
+ * **Hand edits.** A track's visible cells are not necessarily the version its
+ * cursor points at — editing a step leaves the stored version behind, since the
+ * history is only written by generate and Clear. Generating from there and
+ * storing only the new pattern would drop the edit out of reach entirely:
+ * stepping back would land on the version *before* it and jump straight past.
+ * Reference equality detects that, and cheaply — every action here builds a new
+ * cells array rather than mutating one, so a differing reference means an
+ * unrecorded edit. An empty outgoing state is skipped even then, for the reason
+ * above.
  */
 function recordVersion(track: TrackState, next: Snapshot): { history: Snapshot[]; historyIndex: number } {
+  const current = snapshotOf(track);
+  if (!hasActiveSteps(next) && !hasActiveSteps(current)) {
+    return { history: track.history, historyIndex: track.historyIndex };
+  }
+
   const stored = track.history[track.historyIndex];
   const edited = stored === undefined || stored.cells !== track.cells;
 
-  const base = edited
-    ? pushSnapshot(track.history, track.historyIndex, snapshotOf(track))
+  const base = edited && hasActiveSteps(current)
+    ? pushSnapshot(track.history, track.historyIndex, current)
     : { history: track.history, historyIndex: track.historyIndex };
 
   return pushSnapshot(base.history, base.historyIndex, next);

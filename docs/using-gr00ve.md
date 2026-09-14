@@ -183,6 +183,14 @@ return the notes the generator made and quietly drop your edits.
 and discards anything done since. The counter does not move while you edit,
 which is the cue that those changes are not yet a version.
 
+**An empty pattern is not kept.** Silence is not something you need to come
+back to, and storing it would fill the history with identical all-dots entries
+— press Clear three times and the counter would climb for no reason. The
+distinction is which side is empty: clearing a track that *had* steps records
+it, because that is what lets `‹` bring the pattern back, while clearing one
+that was already empty records nothing. The empty version a Clear leaves behind
+is discarded the moment you generate again.
+
 ### The generator panel
 
 At the **bottom of the page**. Two knobs:

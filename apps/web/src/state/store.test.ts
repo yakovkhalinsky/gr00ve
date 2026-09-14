@@ -512,6 +512,73 @@ test('history is bounded, so eight tracks cannot grow without limit', () => {
   assert.equal(t?.historyIndex, (t?.history.length ?? 1) - 1, 'cursor lost after trimming');
 });
 
+test('clearing an already-empty track records nothing', () => {
+  // An empty pattern is silence; there is nothing to come back to. Without
+  // this, pressing Clear repeatedly climbs the counter for no reason.
+  s().clearTrack(4);
+  const after = s().tracks[4];
+
+  s().clearTrack(4);
+  s().clearTrack(4);
+
+  assert.equal(s().tracks[4]?.history.length, after?.history.length, 'empty clears stacked up');
+  assert.equal(s().tracks[4]?.historyIndex, after?.historyIndex);
+});
+
+test('generating onto a cleared track does not store the empty state', () => {
+  // The empty state is skipped in both directions, so a silence never becomes
+  // a version the stepper has to walk through.
+  useGr00ve.setState({ mix: DEFAULT_MIX });
+  s().clearTrack(4);
+  const cleared = s().tracks[4]?.history.length ?? 0;
+
+  s().euclidize(4, 5, 8);
+
+  const t = s().tracks[4];
+  assert.equal(t?.history.length, cleared + 1, 'more than one version was recorded');
+  assert.ok(hasActive(t!), 'the recorded version should be the generated pattern');
+});
+
+/** Whether a track's stored version index has anything that sounds. */
+function hasActive(track: { history: readonly { cells: readonly unknown[] }[]; historyIndex: number }): boolean {
+  return (track.history[track.historyIndex]?.cells ?? []).some((c) => c !== null);
+}
+
+test('empty versions never stack up', () => {
+  // Not "a version is never empty" — one empty version *is* needed, as the
+  // result of clearing a track that had steps, because the cursor rests on it
+  // and that is what `‹` steps back off. The property that matters is that they
+  // never accumulate: an empty pattern followed by another empty pattern is the
+  // counter climbing for no reason, which is what this guards.
+  useGr00ve.setState({ mix: DEFAULT_MIX });
+  s().euclidize(0, 5, 16);
+  s().clearTrack(0);
+  s().clearTrack(0);
+  s().euclidize(0, 3, 8);
+  s().clearTrack(0);
+  s().clearTrack(0);
+  s().euclidize(0, 5, 16);
+
+  for (const track of s().tracks) {
+    const empty = track.history.map((v) => v.cells.every((c) => c === null));
+    for (let i = 1; i < empty.length; i++) {
+      assert.ok(!(empty[i] && empty[i - 1]), `${track.name} stored consecutive empty versions`);
+    }
+  }
+});
+
+test('clearing a track that had steps is still recoverable', () => {
+  // The case the empty-skip must not break: Clear on a pattern that plays.
+  useGr00ve.setState({ mix: DEFAULT_MIX });
+  s().euclidize(5, 5, 16);
+  const before = shape(5);
+
+  s().clearTrack(5);
+  s().stepHistory(5, -1);
+
+  assert.equal(shape(5), before);
+});
+
 test('a track with no history at all does not crash', () => {
   // Defensive: every track is born with one version, but a restored or
   // hand-built state might not be.
