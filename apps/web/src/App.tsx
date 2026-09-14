@@ -60,6 +60,7 @@ export function App(): React.JSX.Element {
   const setTrackLength = useGr00ve((s) => s.setTrackLength);
   const toggleMute = useGr00ve((s) => s.toggleMute);
   const euclidize = useGr00ve((s) => s.euclidize);
+  const clearTrack = useGr00ve((s) => s.clearTrack);
 
   // Local generator controls, pending a proper "generator per track" model.
   const [pulses, setPulses] = useState(5);
@@ -159,13 +160,29 @@ export function App(): React.JSX.Element {
                 onChange={(v) => setTrackLength(i, v)}
                 format={(v) => `${Math.round(v)}`}
               />
-              <button
-                type="button"
-                className="track__euclid"
-                onClick={() => euclidize(i, pulses, steps)}
-              >
-                E({pulses},{steps})
-              </button>
+              {/* Euclid and Clear are stacked in one column so the
+                * generate/erase pair reads as a unit, and so a track strip
+                * stays narrow enough for several tracks to fit on screen. */}
+              <div className="track__gen">
+                <button
+                  type="button"
+                  className="track__euclid"
+                  aria-label={`Generate Euclidean pattern E(${pulses},${steps}) on ${track.name}`}
+                  onClick={() => euclidize(i, pulses, steps)}
+                >
+                  E({pulses},{steps})
+                </button>
+                <button
+                  type="button"
+                  className="track__clear"
+                  // Named per track, so the button is unambiguous out of visual
+                  // context — eight buttons all reading "Clear" are not.
+                  aria-label={`Clear ${track.name}`}
+                  onClick={() => clearTrack(i)}
+                >
+                  Clear
+                </button>
+              </div>
             </div>
             <StepGrid
               trackName={track.name}

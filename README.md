@@ -27,7 +27,12 @@ other (loop lengths 16/16/8/5/16/7/13/16, so they realign roughly every 455
 bars). Plus toggling steps, dragging knobs (relative drag — no jump on grab),
 Shift for fine adjust, arrow keys, double-click to type a value, switching
 scales, per-track loop length, the 12-fader pitch mixer, and **E(k,n)** — click
-a track's `E(5,8)` button to write a Euclidean pattern into it.
+a track's `E(5,8)` button to write a Euclidean pattern into it. Underneath it,
+**Clear** empties that track's steps.
+
+> **There is no undo yet.** Clear is immediate and unrecoverable; regenerating
+> with `E(k,n)` is the way back. The brief lists undo as a recommended control,
+> and this is the first feature that really wants it.
 
 **Doesn't:**
 

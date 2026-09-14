@@ -70,6 +70,7 @@ export interface Gr00veState {
   setTrackLength: (trackIndex: number, length: number) => void;
   toggleMute: (trackIndex: number) => void;
   euclidize: (trackIndex: number, pulses: number, steps: number) => void;
+  clearTrack: (trackIndex: number) => void;
 }
 
 /**
@@ -191,6 +192,22 @@ export const useGr00ve = create<Gr00veState>()(
       const cells = euclidCells(pulses, steps, root, scale);
       const next = tracks.map((t, i) => (i === trackIndex ? { ...t, cells, length: steps } : t));
       set({ tracks: next });
+    },
+
+    /**
+     * Empty a track's steps, keeping its grid length and loop length.
+     *
+     * The grid array and the loop length are independent — `setTrackLength`
+     * changes the loop without touching the array — so this rebuilds at the
+     * *array's* length rather than the loop's. Sizing it from `length` instead
+     * would silently truncate or pad a track whose two have diverged, turning a
+     * "clear the notes" action into a structural edit.
+     */
+    clearTrack: (trackIndex) => {
+      const tracks = get().tracks.map((t, i) =>
+        i === trackIndex ? { ...t, cells: new Array<Step | null>(t.cells.length).fill(null) } : t,
+      );
+      set({ tracks });
     },
   })),
 );

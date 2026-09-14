@@ -99,8 +99,16 @@ body {
 .track__head { display: flex; align-items: center; gap: 10px; min-width: 290px; }
 .track__name { min-height: 32px; padding: 0 10px; background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
 .track__name[aria-pressed='true'] { border-color: var(--accent); }
-.track__mute, .track__euclid { min-height: 32px; padding: 0 10px; background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; cursor: pointer; font-size: 12px; }
+.track__mute, .track__euclid, .track__clear { min-height: 32px; padding: 0 10px; background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; cursor: pointer; font-size: 12px; }
 .track__mute[aria-pressed='true'] { background: var(--accent-hot); border-color: var(--accent-hot); }
+
+/* Generate and erase stacked as one column. */
+.track__gen { display: flex; flex-direction: column; gap: 4px; }
+
+/* Clear is destructive and there is no undo yet, so it sits visually quieter
+ * than the generate button — it should be findable, not inviting. */
+.track__clear { color: var(--muted); }
+.track__clear:hover { color: var(--text); border-color: #4a4a5c; }
 
 /* --- Step grid ----------------------------------------------------------- */
 
