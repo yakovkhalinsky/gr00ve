@@ -15,4 +15,5 @@
 export * from './learn.ts';
 export * from './webmidi.ts';
 export * from './novation/lcxl3.ts';
+export * from './output.ts';
 export * from './akai/apcMiniMk2.ts';

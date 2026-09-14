@@ -1,0 +1,183 @@
+/* Reading styles for the rendered guide.
+ *
+ * Deliberately separate from `styles.css`: the sequencer is a dense control
+ * surface where every pixel is a hit target, and a document is the opposite
+ * problem. Sharing the stylesheet would mean either cramped prose or a rack
+ * with document-sized line heights.
+ *
+ * The palette is the same, so arriving here from the app doesn't feel like
+ * leaving it.
+ */
+
+:root {
+  --bg: #101014;
+  --panel: #191920;
+  --panel-2: #22222c;
+  --line: #2f2f3a;
+  --text: #e7e7ef;
+  --muted: #9a9aa8;
+  --accent: #5b8cf5;
+  --accent-hot: #e6603c;
+  --measure: 68ch;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+body.guide {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 17px/1.7 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.guide__bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 24px;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+.guide__back { color: var(--accent); text-decoration: none; font-size: 15px; font-weight: 600; }
+.guide__back:hover { text-decoration: underline; text-underline-offset: 3px; }
+.guide__kicker { color: var(--muted); font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; }
+
+.prose {
+  max-width: var(--measure);
+  margin: 0 auto;
+  padding: 40px 24px 96px;
+}
+
+/* --- headings ------------------------------------------------------------ */
+
+.prose h1 {
+  font-size: 34px;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  margin: 0 0 8px;
+}
+.prose h2 {
+  font-size: 24px;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  margin: 56px 0 14px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+}
+.prose h3 { font-size: 18px; margin: 34px 0 10px; }
+/* An anchor link back to each heading, shown on hover. */
+.prose h2:hover::after,
+.prose h3:hover::after {
+  content: ' #';
+  color: var(--muted);
+  font-weight: 400;
+}
+
+/* --- text ---------------------------------------------------------------- */
+
+.prose p { margin: 0 0 16px; }
+.prose strong { font-weight: 650; }
+.prose a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.prose a:hover { text-decoration-thickness: 2px; }
+
+.prose ul, .prose ol { margin: 0 0 16px; padding-left: 24px; }
+.prose li { margin: 6px 0; }
+.prose li > p { margin-bottom: 8px; }
+
+.prose hr { border: 0; border-top: 1px solid var(--line); margin: 44px 0; }
+
+.prose blockquote {
+  margin: 20px 0;
+  padding: 2px 0 2px 18px;
+  border-left: 3px solid var(--accent);
+  color: var(--muted);
+}
+.prose blockquote p:last-child { margin-bottom: 0; }
+
+.prose code {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  font-size: 0.87em;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 0.12em 0.38em;
+}
+.prose pre {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 16px;
+  overflow-x: auto;
+}
+.prose pre code { background: none; border: 0; padding: 0; font-size: 0.85em; }
+
+/* --- tables -------------------------------------------------------------- */
+
+/* The guide is mostly tables, so they get the most attention. Full width to
+ * the measure, a header that reads as a header, and enough cell padding that
+ * a dense reference stays scannable rather than becoming a grid of text. */
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 22px 0;
+  font-size: 15px;
+  line-height: 1.5;
+}
+.prose thead th {
+  text-align: left;
+  font-weight: 650;
+  color: var(--text);
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  padding: 10px 12px;
+  white-space: nowrap;
+}
+.prose tbody td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+  color: var(--muted);
+}
+/* The first cell names the thing, so it carries the emphasis. */
+.prose tbody td:first-child { color: var(--text); }
+.prose tbody tr:last-child td { border-bottom: 0; }
+.prose tbody tr:hover td { background: color-mix(in srgb, var(--panel) 60%, transparent); }
+
+/* Long tables scroll rather than squashing their columns into unreadability. */
+@media (max-width: 640px) {
+  .prose table { display: block; overflow-x: auto; white-space: nowrap; }
+  .prose tbody td { white-space: normal; }
+  .prose { font-size: 16px; padding: 28px 18px 72px; }
+}
+
+/* --- table of contents --------------------------------------------------- */
+
+.toc {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px 20px 18px;
+  margin: 0 0 40px;
+}
+.toc__title {
+  margin: 0 0 8px;
+  font-size: 12px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.toc ul { margin: 0; padding: 0; list-style: none; columns: 2; column-gap: 28px; }
+.toc li { margin: 4px 0; break-inside: avoid; }
+.toc a { color: var(--text); text-decoration: none; font-size: 15px; }
+.toc a:hover { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+@media (max-width: 640px) { .toc ul { columns: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}

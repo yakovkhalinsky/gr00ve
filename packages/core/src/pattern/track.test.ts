@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   TRACK_KINDS, TRACK_KIND_LABELS, DRUM_TYPES, DRUM_LABELS, DEFAULT_KIT,
-  isTrackKind, isDrumType,
+  DRUM_MIDI_PITCH, isTrackKind, isDrumType,
 } from './track.ts';
 
 test('every track kind has a label', () => {
@@ -48,4 +48,27 @@ test('the default kit is a usable spread across eight tracks', () => {
   assert.ok(DEFAULT_KIT.includes('snare') || DEFAULT_KIT.includes('clap'));
   // Hats and claps should not be the only textural options.
   assert.ok(new Set(DEFAULT_KIT).size >= 4, 'kit should use at least four distinct sounds');
+});
+
+test('every drum maps to a distinct MIDI note', () => {
+  // Distinct matters: a rhythm track sent over MIDI to a drum module would
+  // otherwise collapse two drums onto one voice.
+  const pitches = DRUM_TYPES.map((d) => DRUM_MIDI_PITCH[d]);
+  assert.equal(new Set(pitches).size, pitches.length, 'two drums share a note');
+  for (const p of pitches) {
+    assert.ok(Number.isInteger(p) && p >= 0 && p <= 127, `note ${p} out of range`);
+  }
+});
+
+test('the drum map follows General MIDI where it can', () => {
+  // Not arbitrary: a drum module or DAW will decode these, and 36-is-a-kick is
+  // the closest thing the format has to a standard. A CV converter only cares
+  // that a gate opened, so this costs nothing and buys interoperability.
+  assert.equal(DRUM_MIDI_PITCH.kick, 36);
+  assert.equal(DRUM_MIDI_PITCH.snare, 38);
+  assert.equal(DRUM_MIDI_PITCH.hat, 42);
+  // GM keeps its percussion notes in the 35-81 range.
+  for (const drum of DRUM_TYPES) {
+    assert.ok(DRUM_MIDI_PITCH[drum] >= 35 && DRUM_MIDI_PITCH[drum] <= 81, drum);
+  }
 });

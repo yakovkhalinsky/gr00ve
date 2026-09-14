@@ -24,14 +24,48 @@
  * released to the UI only when the audio clock actually reaches them.
  */
 
-import type { DrumType, TrackKind } from '@gr00ve/core';
+import { DRUM_MIDI_PITCH, type DrumType, type TrackKind } from '@gr00ve/core';
 
 import { DrumVoice, DRUM_DEFAULTS } from './drums.ts';
 import type { Instrument } from './instrument.ts';
 import { Scheduler } from './scheduler.ts';
-import { collectDueSteps, stepDuration, stepsDueForDisplay, type Cursor, type Tempo } from './timeline.ts';
+import {
+  collectClockTicks, collectDueSteps, stepDuration, stepsDueForDisplay,
+  type ClockCursor, type Cursor, type Tempo,
+} from './timeline.ts';
 import { isAudible, trackStep, type Track } from './transport.ts';
 import { DEFAULT_VOICE, Voice, midiToFreq, type VoiceParams } from './voice.ts';
+
+/**
+ * What the engine tells the outside world about what it is playing.
+ *
+ * Deliberately **not** MIDI-shaped. A sink receives note *intent* — which
+ * track, which pitch, how long, when — and decides what to do with it. That
+ * keeps this package free of any MIDI dependency, so the wire protocol, the
+ * channel mapping and the clock-domain conversion all live in
+ * `@gr00ve/midi` where they can be tested without an AudioContext.
+ */
+export interface SinkNote {
+  /** Index of the track that produced this note. */
+  readonly trackIndex: number;
+  /** MIDI note number. A rhythm track reports its drum's mapped pitch. */
+  readonly pitch: number;
+  /** Raw step velocity, 0..1. The sink maps it to whatever it needs. */
+  readonly stepVelocity: number;
+  readonly accent: boolean;
+  /** Note length in seconds, already clamped to leave a gate gap. */
+  readonly duration: number;
+  /** Audio-clock time, seconds. The sink converts to its own domain. */
+  readonly time: number;
+}
+
+export interface PlaybackSink {
+  note(event: SinkNote): void;
+  /** A 24 ppqn timing tick. */
+  clock(time: number): void;
+  transportStart(): void;
+  transportStop(): void;
+}
 
 /** A track as the engine sees it: transport concerns plus an instrument. */
 export interface EngineTrack extends Track {
@@ -59,6 +93,17 @@ export interface EngineOptions {
    * loop, so the caller must map it through `trackStep` per track.
    */
   readonly onStep?: (globalStep: number) => void;
+  /** Where note and clock events go. Omit for local-only playback. */
+  readonly sink?: PlaybackSink | undefined;
+  /**
+   * Whether to emit 24 ppqn timing clocks.
+   *
+   * A predicate rather than a flag because the performer can toggle clock out
+   * *while playing*, and the engine is only constructed once. A boolean here
+   * would freeze the setting at construction and the toggle would appear to do
+   * nothing until a restart.
+   */
+  readonly clockOut?: (() => boolean) | undefined;
 }
 
 /** How long to wait before tearing down a swapped-out instrument. */
@@ -79,6 +124,8 @@ export class SequencerEngine {
   private readonly instruments = new Map<number, { spec: string; instrument: Instrument }>();
 
   private cursor: Cursor = { step: 0, time: 0 };
+  /** Timing-clock cursor, independent of the step cursor. */
+  private clockCursor: ClockCursor = { tick: 0, time: 0 };
   private uiQueue: readonly { step: number; time: number }[] = [];
   private raf: number | undefined;
   private running = false;
@@ -133,10 +180,14 @@ export class SequencerEngine {
     // Start slightly ahead so the first step is not already in the past.
     const origin = this.ctx.currentTime + 0.08;
     this.cursor = { step: 0, time: origin };
+    // The clock starts on the same origin as the first step, so a rack
+    // following it lands on the same grid rather than a tick or two out.
+    this.clockCursor = { tick: 0, time: origin };
     this.uiQueue = [];
     this.pendingSlide = [];
     this.master.gain.setTargetAtTime(0.28, this.ctx.currentTime, 0.01);
 
+    this.options.sink?.transportStart();
     this.scheduler.start(origin);
     this.pump();
   }
@@ -156,6 +207,7 @@ export class SequencerEngine {
 
     this.uiQueue = [];
     this.pendingSlide = [];
+    this.options.sink?.transportStop();
     this.options.onStep?.(-1);
   }
 
@@ -175,12 +227,26 @@ export class SequencerEngine {
       swing: state.swing,
     };
 
+    // Clock first, so a rack following it is already running when the notes
+    // land rather than starting a tick late.
+    if (this.options.sink && this.options.clockOut?.() === true) {
+      this.scheduleClock(tempo.bpm, horizon);
+    }
+
     const { steps, cursor } = collectDueSteps(this.cursor, tempo, horizon);
     for (const { step, time } of steps) {
       this.scheduleStep(state, tempo, step, time);
       this.uiQueue = [...this.uiQueue, { step, time }];
     }
     this.cursor = cursor;
+  }
+
+  private scheduleClock(bpm: number, horizon: number): void {
+    const sink = this.options.sink;
+    if (!sink) return;
+    const { times, cursor } = collectClockTicks(this.clockCursor, bpm, horizon);
+    for (const time of times) sink.clock(time);
+    this.clockCursor = cursor;
   }
 
   private scheduleStep(state: EngineState, tempo: Tempo, globalStep: number, time: number): void {
@@ -209,8 +275,43 @@ export class SequencerEngine {
       // A slide ties into the following step, so its gate must not close early.
       const gate = cell.slide ? 1 : Math.max(0.01, cell.gate);
       instrument.noteOn(time, midiToFreq(cell.pitch), gate * duration, cell.accent, glide);
+      this.emitNote(i, track, cell, time, gate * duration, duration);
 
       this.pendingSlide[i] = cell.slide;
+    });
+  }
+
+  /**
+   * Hand a note to the sink, if there is one.
+   *
+   * `noteSeconds` is clamped just short of a full step. A slide ties its note
+   * into the following one, so its gate is a whole step — meaning the note-off
+   * would land exactly on the next note-on. On a MIDI-to-CV module the gate
+   * would then never close, and the second note would not retrigger. A sliver of
+   * silence guarantees the gate falls.
+   */
+  private emitNote(
+    trackIndex: number,
+    track: EngineTrack,
+    cell: { pitch: number; velocity: number; accent: boolean },
+    time: number,
+    noteSeconds: number,
+    stepSeconds: number,
+  ): void {
+    const sink = this.options.sink;
+    if (!sink) return;
+
+    const pitch = track.kind === 'rhythm'
+      ? DRUM_MIDI_PITCH[track.drum] ?? 36
+      : cell.pitch;
+
+    sink.note({
+      trackIndex,
+      pitch,
+      stepVelocity: cell.velocity,
+      accent: cell.accent,
+      duration: Math.min(noteSeconds, stepSeconds * 0.98),
+      time,
     });
   }
 

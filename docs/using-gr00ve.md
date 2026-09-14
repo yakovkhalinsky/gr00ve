@@ -148,6 +148,43 @@ floor is E(4,16); three-against-eight is the tresillo.
 **Generation is repeatable.** Clicking E twice with the same settings gives the
 same phrase. Change a pitch fader or `k`/`n` and it gives a different one.
 
+### MIDI out
+
+Press **Enable MIDI out**, allow the browser's permission prompt, and pick a
+port. The sequencer then plays whatever is on the other end.
+
+Built for a **MIDI-to-CV module** in a Eurorack rig, which is why the defaults
+are what they are:
+
+- **One channel per track.** Track 1 sends on channel 1, through track 8 on
+  channel 8. A module like an Expert Sleepers FH-2 or a Mutable Yarns maps each
+  channel to its own pitch CV and gate pair, so eight tracks are eight voices
+  rather than a queue on one wire. Configure your module to match; the mapping
+  is fixed for now.
+- **Gate length follows the step.** Gate length comes from the gap between
+  note-on and note-off, so both are always sent — and a slide, whose gate would
+  otherwise run right up to the next note, is shortened by a sliver so the
+  following note still retriggers. Without that the gate would never close and
+  the note after a slide would not sound.
+- **Accents go out at full velocity** (127); ordinary notes sit in a band well
+  below (~100). Route velocity to a second CV if your module has one spare.
+- **Drum tracks send General MIDI notes** — kick 36, snare 38, hat 42 — so a
+  rhythm track also drives a drum module or a DAW, not just a gate.
+- **Clock (24 ppqn)** is a checkbox. Turn it on to run anything with its own
+  sequencer: a clocked LFO, a second sequencer, a euclidean module. Transport
+  start and stop are sent too, on Play and Stop. It can be toggled while
+  playing.
+
+Two things to know:
+
+- **The permission prompt needs a click.** Browsers refuse to raise it
+  unprompted, which is why nothing is requested until you press the button.
+- **Timing is timestamped.** Notes and clocks are sent with a future timestamp
+  rather than fired immediately, so they land on the audio clock instead of the
+  moment a JavaScript timer happened to run. If something in the rack sounds a
+  few milliseconds loose, check the module's own clock source isn't also
+  running — two clocks is two tempos.
+
 ---
 
 ## Controls
@@ -190,9 +227,14 @@ Things that are missing rather than hidden:
 - **No saving.** A page reload loses everything. There's no export yet either.
 - **The generator panel is below the tracks**, so the `k` and `n` that E(k,n)
   uses are off-screen when you press it. A layout wart.
-- **No MIDI input yet.** Hardware controller support is written and tested but
-  not connected, so a Launch Control XL 3 won't do anything yet.
-- **Nothing plays external gear.** MIDI output isn't wired.
+- **No MIDI input.** Nothing responds to a hardware controller yet. The mapping
+  semantics and the Launch Control XL 3 / APC mini mk2 SysEx are written and
+  tested, but not connected — so a controller plugged in does nothing.
+- **MIDI channels aren't configurable.** The track-to-channel mapping is fixed
+  at 1:1. If your module is set up differently, change it there.
+- **No MIDI clock input.** The sequencer can be a clock master but not a slave,
+  which is a browser limitation rather than a choice: there is no way to do
+  stable MIDI clock input with the APIs available.
 - **Track register, drum tuning and pattern rotation aren't exposed.** The
   engine honours all three — they're seeded per track and audible — but there's
   no control for them.

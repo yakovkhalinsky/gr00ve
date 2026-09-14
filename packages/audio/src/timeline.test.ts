@@ -2,8 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  stepDuration, swingDisplacement, stepTime, collectDueSteps, stepsDueForDisplay,
-  type Tempo, type Cursor,
+  PPQN, clockInterval, collectClockTicks, collectDueSteps, stepDuration, stepTime,
+  stepsDueForDisplay, swingDisplacement,
+  type ClockCursor, type Cursor, type Tempo,
 } from './timeline.ts';
 
 const tempo = (over: Partial<Tempo> = {}): Tempo => ({ bpm: 120, stepsPerBeat: 4, swing: 0, ...over });
@@ -136,4 +137,90 @@ test('display queue releases steps only once the clock reaches them', () => {
 test('a step exactly at the clock is due, not deferred', () => {
   const queue = [{ step: 0, time: 10 }];
   assert.deepEqual(stepsDueForDisplay(queue, 10).due.map((e) => e.step), [0]);
+});
+
+// --- clock generation -------------------------------------------------------
+
+test('there are 24 clock ticks per quarter note', () => {
+  assert.equal(PPQN, 24);
+  // At 120 BPM a quarter note is 0.5s, so a tick is 0.5/24.
+  assert.ok(Math.abs(clockInterval(120) - 0.5 / 24) < 1e-12);
+  assert.ok(Math.abs(clockInterval(60) - 1 / 24) < 1e-12);
+});
+
+test('clockInterval survives a nonsense tempo', () => {
+  assert.ok(Number.isFinite(clockInterval(0)));
+  assert.ok(clockInterval(0) > 0);
+  assert.ok(clockInterval(-10) > 0);
+});
+
+test('collectClockTicks returns the ticks due before the horizon', () => {
+  const interval = clockInterval(120); // 0.02083s
+  const cursor: ClockCursor = { tick: 0, time: 10 };
+  const { times } = collectClockTicks(cursor, 120, 10 + interval * 3.5);
+  // Ticks at 10, 10+i, 10+2i, 10+3i — four fit before 10+3.5i.
+  assert.equal(times.length, 4);
+  assert.ok(Math.abs((times[0] ?? 0) - 10) < 1e-12);
+  assert.ok(Math.abs((times[3] ?? 0) - (10 + interval * 3)) < 1e-12);
+});
+
+test('collectClockTicks advances the cursor past the horizon', () => {
+  const interval = clockInterval(120);
+  const { cursor } = collectClockTicks({ tick: 0, time: 0 }, 120, interval * 3.5);
+  assert.equal(cursor.tick, 4);
+  assert.ok(cursor.time >= interval * 3.5);
+});
+
+test('a zero or negative horizon yields no ticks but still terminates', () => {
+  assert.equal(collectClockTicks({ tick: 0, time: 0 }, 120, 0).times.length, 0);
+  assert.equal(collectClockTicks({ tick: 0, time: 0 }, 120, -5).times.length, 0);
+});
+
+test('consecutive clock windows tile without gaps or duplicates', () => {
+  let cursor: ClockCursor = { tick: 0, time: 0 };
+  const seen: number[] = [];
+  for (let w = 0; w < 200; w++) {
+    const r = collectClockTicks(cursor, 128, (w + 1) * 0.025);
+    seen.push(...r.times);
+    cursor = r.cursor;
+  }
+  // Monotonic and evenly spaced: the property a rack following the clock needs.
+  for (let i = 1; i < seen.length; i++) {
+    assert.ok((seen[i] ?? 0) > (seen[i - 1] ?? 0), `tick ${i} not increasing`);
+  }
+  const interval = clockInterval(128);
+  for (const t of seen) {
+    const ratio = t / interval;
+    assert.ok(Math.abs(ratio - Math.round(ratio)) < 1e-9, `tick at ${t} is off-grid`);
+  }
+});
+
+test('the clock does not accumulate drift over a long run', () => {
+  // Ten minutes at 128 BPM is 24 * 128 * 10 = 30720 ticks. Scheduled from a
+  // cursor rather than recomputed, it must land exactly on the grid.
+  const bpm = 128;
+  let cursor: ClockCursor = { tick: 0, time: 0 };
+  const HORIZON = 600;
+  while (cursor.time < HORIZON) {
+    cursor = collectClockTicks(cursor, bpm, cursor.time + 0.1).cursor;
+  }
+  const expectedTick = Math.floor(cursor.time / clockInterval(bpm));
+  assert.ok(
+    Math.abs(cursor.tick - expectedTick) <= 1,
+    `drift: cursor at tick ${cursor.tick}, grid says ${expectedTick}`,
+  );
+});
+
+test('a tempo change takes effect from the next tick, not retroactively', () => {
+  const cursor: ClockCursor = { tick: 0, time: 0 };
+  const slow = collectClockTicks(cursor, 60, clockInterval(60) * 2.5);
+  assert.equal(slow.times.length, 3);
+
+  // Resume from that cursor at double tempo: spacing halves, but the times
+  // already emitted are untouched.
+  const fast = collectClockTicks(slow.cursor, 120, slow.cursor.time + clockInterval(120) * 2.5);
+  assert.equal(fast.times.length, 3);
+  const gapFast = (fast.times[1] ?? 0) - (fast.times[0] ?? 0);
+  assert.ok(Math.abs(gapFast - clockInterval(120)) < 1e-12);
+  assert.ok(fast.times[0] === slow.cursor.time, 'the first new tick moved');
 });

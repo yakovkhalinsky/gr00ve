@@ -108,6 +108,19 @@ export interface Gr00veState {
   clearTrack: (trackIndex: number) => void;
   setTrackKind: (trackIndex: number, kind: TrackKind) => void;
   setDrum: (trackIndex: number, drum: DrumType) => void;
+
+  /**
+   * Id of the selected MIDI output, or null for none.
+   *
+   * An id rather than the `MIDIOutput` itself: the handle does not belong in a
+   * store, and resolving it late means a device unplugged and replugged keeps
+   * working. See `audio/midiPorts.ts`.
+   */
+  readonly midiOutputId: string | null;
+  /** Send 24 ppqn timing clocks. Live — toggling mid-playback takes effect. */
+  readonly midiClock: boolean;
+  setMidiOutput: (id: string | null) => void;
+  setMidiClock: (on: boolean) => void;
 }
 
 /**
@@ -372,6 +385,11 @@ export const useGr00ve = create<Gr00veState>()(
       const tracks = get().tracks.map((t, i) => (i === trackIndex ? { ...t, drum } : t));
       set({ tracks });
     },
+
+    midiOutputId: null,
+    midiClock: false,
+    setMidiOutput: (midiOutputId) => set({ midiOutputId }),
+    setMidiClock: (midiClock) => set({ midiClock }),
   })),
 );
 

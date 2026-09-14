@@ -8,6 +8,7 @@ import { trackStep } from '@gr00ve/audio';
 import { useGr00ve, type TrackState } from './state/store.ts';
 import { useEngine } from './audio/useEngine.ts';
 import { Knob } from './ui/Knob.tsx';
+import { MidiPanel } from './ui/MidiPanel.tsx';
 import { StepGrid } from './ui/StepGrid.tsx';
 
 /**
@@ -106,18 +107,15 @@ export function App(): React.JSX.Element {
           <span className="transport__root">{noteName(root)}</span>
         </div>
 
-        {/* Links to the rendered markdown on GitHub rather than to the copy in
-          * this deployment — GitHub Pages serves .md as plain text, so a
-          * relative link would show the reader raw source. */}
-        <a
-          className="transport__help"
-          href="https://github.com/yakovkhalinsky/gr00ve/blob/main/docs/using-gr00ve.md"
-          target="_blank"
-          rel="noreferrer"
-        >
+        {/* The guide is its own page in this deployment, built from the same
+          * markdown the repo holds. Base-aware, so it resolves at `/` in dev
+          * and `/gr00ve/` on Pages. */}
+        <a className="transport__help" href={`${import.meta.env.BASE_URL}guide.html`}>
           How to use this
         </a>
       </header>
+
+      <MidiPanel />
 
       <section className="mixer" aria-label="Pitch probability mixer">
         <h2 className="mixer__title">Pitch probability</h2>

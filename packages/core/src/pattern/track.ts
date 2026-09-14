@@ -52,3 +52,21 @@ export function isDrumType(value: unknown): value is DrumType {
 
 /** A sensible starter kit spread across eight tracks. */
 export const DEFAULT_KIT: readonly DrumType[] = ['kick', 'clap', 'hat', 'rim', 'kick', 'snare', 'hat', 'tom'];
+
+/**
+ * The MIDI note each drum plays.
+ *
+ * These are General MIDI drum-map numbers rather than arbitrary ones, so a
+ * rhythm track sent out over MIDI behaves sensibly whichever it lands on: a CV
+ * converter only cares that a gate opened, but a drum module or a DAW will
+ * decode the note, and 36 being a kick is the closest thing to a standard the
+ * format has.
+ */
+export const DRUM_MIDI_PITCH: Readonly<Record<DrumType, number>> = {
+  kick: 36, // Bass Drum 1
+  rim: 37, // Side Stick
+  snare: 38, // Acoustic Snare
+  clap: 39, // Hand Clap
+  tom: 45, // Low Tom
+  hat: 42, // Closed Hi-Hat
+};

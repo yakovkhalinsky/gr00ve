@@ -6,6 +6,7 @@ import {
 } from '@gr00ve/audio';
 
 import { useGr00ve, type TrackState } from '../state/store.ts';
+import { createMidiSink } from './midiSink.ts';
 
 /**
  * Wire the store to the audio engine.
@@ -98,6 +99,14 @@ export function useEngine(): EngineHandle {
     if (!engine) {
       engine = new SequencerEngine(currentEngineState, {
         onStep: (globalStep) => useGr00ve.getState().setGlobalStep(globalStep),
+        // The sink reads live from the store on every event, so changing output
+        // or toggling clock mid-playback takes effect immediately rather than
+        // needing a restart.
+        sink: createMidiSink(
+          () => engineRef.current?.context,
+          () => useGr00ve.getState().midiOutputId,
+        ),
+        clockOut: () => useGr00ve.getState().midiClock,
       });
       engineRef.current = engine;
     }

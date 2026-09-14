@@ -51,6 +51,56 @@ export interface Cursor {
   readonly time: number;
 }
 
+// --- clock generation -------------------------------------------------------
+//
+// Timing clocks, for driving gear that keeps its own time: a clocked LFO, a
+// second sequencer, a euclidean module. The *rate* is a MIDI convention, but
+// the scheduling is the same lookahead arithmetic as everything else here, so
+// it lives in this package rather than in @gr00ve/midi — the engine hands tick
+// times to a sink and never learns what a status byte is.
+
+/** Timing clocks per quarter note. Fixed at 24 by the MIDI spec. */
+export const PPQN = 24;
+
+/** A running clock cursor: which tick is next, and when it falls. */
+export interface ClockCursor {
+  /** Tick index since the transport started. */
+  readonly tick: number;
+  /** Audio time of that tick, seconds. */
+  readonly time: number;
+}
+
+/** Seconds between clock ticks at a given tempo. */
+export function clockInterval(bpm: number): number {
+  return 60 / Math.max(1, bpm) / PPQN;
+}
+
+/**
+ * Collect every clock tick due before `horizon` and advance the cursor.
+ *
+ * Same shape as `collectDueSteps`, and for the same reason: ticks come from the
+ * audio clock, so drift is impossible by construction rather than corrected
+ * later. A tempo change takes effect from the next tick, which is what a rack
+ * following the clock expects.
+ */
+export function collectClockTicks(
+  cursor: ClockCursor,
+  bpm: number,
+  horizon: number,
+): { times: number[]; cursor: ClockCursor } {
+  const interval = clockInterval(bpm);
+  const times: number[] = [];
+  let tick = cursor.tick;
+  let time = cursor.time;
+  // Bounded so a nonsense tempo cannot spin forever and wedge the caller.
+  for (let guard = 0; guard < 4096 && time < horizon; guard++) {
+    times.push(time);
+    time += interval;
+    tick += 1;
+  }
+  return { times, cursor: { tick, time } };
+}
+
 export interface DueSteps {
   readonly steps: readonly { step: number; time: number }[];
   readonly cursor: Cursor;

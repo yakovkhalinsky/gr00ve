@@ -9,8 +9,10 @@ is in **[docs/research-brief.md](docs/research-brief.md)**, and it is worth
 reading before changing anything here, because most of the non-obvious decisions
 in this repo come from it.
 
-**Just want to play it?** **[docs/using-gr00ve.md](docs/using-gr00ve.md)** is the
-user guide — a five-minute tour, then a reference for every control.
+**Just want to play it?** The user guide is at **[/gr00ve/guide.html](https://yakov.khalinsky.com/gr00ve/guide.html)**
+— a five-minute tour, then a reference for every control. It is rendered from
+[docs/using-gr00ve.md](docs/using-gr00ve.md) at build time, so the markdown a
+contributor edits and the page a musician reads are the same file.
 
 **Live demo:** <https://yakov.khalinsky.com/gr00ve/>
 
@@ -35,15 +37,22 @@ pattern into it. Underneath it, **Clear** empties that track's steps.
 The **twelve pitch faders drive generation**: they decide which notes E(k,n)
 writes. Moving a fader and pressing E again gives a different phrase.
 
+**MIDI out** drives external gear: one MIDI channel per track, timestamped note
+on/off, and optional 24 ppqn clock. Built for a MIDI-to-CV module in a Eurorack
+rig — see the guide for what the defaults assume.
+
 > **There is no undo yet.** Clear is immediate and unrecoverable; regenerating
 > with `E(k,n)` is the way back. The brief lists undo as a recommended control,
 > and this is the first feature that really wants it.
 
 **Doesn't:**
 
-- **No MIDI input yet.** The mapping semantics (encoder relative modes, fader
+- **No MIDI input.** The mapping semantics (encoder relative modes, fader
   pickup) and the Launch Control XL 3 / APC mini mk2 SysEx are implemented and
-  tested in `@gr00ve/midi`, but nothing is bound to the UI.
+  tested in `@gr00ve/midi`, but nothing is bound to the UI — a controller
+  plugged in does nothing. MIDI *output* works.
+- **MIDI channels are fixed at 1:1** with track index. Per-track channel
+  assignment is the obvious next step for a rack that isn't wired that way.
 - **Track register isn't exposed.** Each track carries a semitone offset applied
   to the mixer's pitches, seeded per track so eight tracks don't all generate in
   one octave — but there is no control for it yet.

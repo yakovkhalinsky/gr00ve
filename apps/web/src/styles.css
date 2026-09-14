@@ -91,6 +91,28 @@ body {
 .knob__value { font-size: 11px; color: var(--text); font-variant-numeric: tabular-nums; }
 .knob__input { width: 60px; background: var(--panel-2); color: var(--text); border: 1px solid var(--accent); border-radius: 4px; }
 
+/* --- MIDI out ------------------------------------------------------------ */
+
+.midi {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding: 10px 18px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 12px;
+}
+.midi__enable { min-height: 32px; padding: 0 12px; background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
+.midi__enable:hover { border-color: var(--accent); }
+.midi__field { display: flex; align-items: center; gap: 6px; color: var(--muted); }
+.midi__field select { min-height: 30px; padding: 0 6px; background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; max-width: 24ch; }
+.midi__field--check { cursor: pointer; }
+.midi__field--check input { accent-color: var(--accent); }
+.midi__hint { color: var(--muted); flex: 1; min-width: 20ch; }
+.midi__warn { color: var(--accent-hot); }
+
 /* --- Pitch probability mixer --------------------------------------------- */
 
 .mixer { padding: 14px 18px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
