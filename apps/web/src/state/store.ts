@@ -125,19 +125,20 @@ interface SeedSpec {
 }
 
 const SEED: readonly SeedSpec[] = [
+  // Melodic first, spread across three registers, and polymetric against the
+  // kit below. Two tracks share the middle register deliberately — their loop
+  // lengths (8 and 7) drift against each other, so they interleave rather than
+  // collide.
+  { pulses: 4, steps: 16, register: -12, kind: 'voice', drum: 'kick' }, // bass
+  { pulses: 5, steps: 8, register: 0, kind: 'voice', drum: 'kick' },
+  { pulses: 3, steps: 7, register: 0, kind: 'voice', drum: 'kick' },
+  { pulses: 5, steps: 13, register: 12, kind: 'voice', drum: 'kick' },
   // The kit. E(4,16) is four-on-the-floor; E(8,16) is eighth-note hats.
   // Register is unused on a rhythm track — drums ignore pitch.
   { pulses: 4, steps: 16, register: 0, kind: 'rhythm', drum: 'kick' },
   { pulses: 3, steps: 16, register: 0, kind: 'rhythm', drum: 'clap' },
   { pulses: 8, steps: 16, register: 0, kind: 'rhythm', drum: 'hat' },
   { pulses: 5, steps: 16, register: 0, kind: 'rhythm', drum: 'rim' },
-  // Melodic, spread across three registers, and polymetric against the kit.
-  // Two tracks share the middle register deliberately — their loop lengths (8
-  // and 7) drift against each other, so they interleave rather than collide.
-  { pulses: 4, steps: 16, register: -12, kind: 'voice', drum: 'kick' }, // bass
-  { pulses: 5, steps: 8, register: 0, kind: 'voice', drum: 'kick' },
-  { pulses: 3, steps: 7, register: 0, kind: 'voice', drum: 'kick' },
-  { pulses: 5, steps: 13, register: 12, kind: 'voice', drum: 'kick' },
 ];
 
 /**

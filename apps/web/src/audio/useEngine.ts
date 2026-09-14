@@ -29,7 +29,7 @@ import { useGr00ve, type TrackState } from '../state/store.ts';
  * and `voice` is attached here rather than passed as a parallel array so that
  * a track carries everything needed to sound it.
  */
-function toEngineTrack(track: TrackState, index: number): EngineTrack {
+function toEngineTrack(track: TrackState): EngineTrack {
   return {
     id: track.id,
     name: track.name,
@@ -39,7 +39,7 @@ function toEngineTrack(track: TrackState, index: number): EngineTrack {
     solo: track.solo,
     kind: track.kind,
     drum: track.drum,
-    voice: trackVoice(index),
+    voice: voiceForRegister(track.register),
   };
 }
 
@@ -55,20 +55,29 @@ export function currentEngineState(): EngineState {
 }
 
 /**
- * Per-track voice settings.
+ * Melodic voice settings, derived from a track's **register** rather than its
+ * position in the rack.
  *
- * Eight tracks sharing one timbre is mush, and the fastest way to make a
- * generated pattern legible is to spread the register: low tracks darker and
- * shorter, high tracks brighter. Deliberately simple — per-track instrument
- * design is a taste decision, not a research finding.
+ * A bass should be darker and a lead brighter, so the register is the musically
+ * meaningful axis: low tracks get a lower cutoff and a slightly shorter decay,
+ * high tracks open up. Keying this to the track *index* instead — as an earlier
+ * version did — makes the timbre change when tracks are reordered, which is
+ * exactly what happened when the kit moved from the first four slots to the
+ * last four and the melodic tracks silently inherited the darkest half of the
+ * spread.
+ *
+ * Register 0 reproduces `DEFAULT_VOICE` exactly, so the default track sounds
+ * as designed and only the extremes are coloured. Deliberately simple:
+ * per-track instrument design is a taste decision, not a research finding.
  */
-export function trackVoice(index: number): VoiceParams {
-  const spread = Math.max(0, Math.min(7, index));
+export function voiceForRegister(register: number): VoiceParams {
+  // Clamped to ±2 octaves; anything wider is not a register, it is a mistake.
+  const octave = Math.max(-2, Math.min(2, register / 12));
   return {
     ...DEFAULT_VOICE,
-    cutoff: 200 + spread * 95,
-    envMod: 1200 + spread * 280,
-    decay: 0.13 + spread * 0.025,
+    cutoff: DEFAULT_VOICE.cutoff + octave * 140,
+    envMod: DEFAULT_VOICE.envMod + octave * 400,
+    decay: DEFAULT_VOICE.decay + octave * 0.03,
     level: 0.44,
   };
 }
