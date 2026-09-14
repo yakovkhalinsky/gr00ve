@@ -61,6 +61,18 @@ export interface TrackState {
    * small, obvious follow-up.
    */
   readonly register: number;
+  /**
+   * Euclidean phase offset, in steps.
+   *
+   * Stored per track rather than re-picked each time, so pressing E preserves
+   * where a pattern sits. Without this, re-generating the backbeat snare would
+   * silently move it from beats 2 and 4 back to 1 and 3 — E(2,16) is maximally
+   * even only at phase 0, so a rotation is the only way to place it.
+   *
+   * Not exposed in the UI; seeded per track. A rotate control is in the brief's
+   * operator catalogue and is the natural way to surface it.
+   */
+  readonly rotation: number;
 }
 
 export interface Gr00veState {
@@ -118,6 +130,8 @@ export interface Gr00veState {
 interface SeedSpec {
   readonly pulses: number;
   readonly steps: number;
+  /** Euclidean phase offset in steps. */
+  readonly rotation: number;
   /** Semitone offset applied to the mixer's pitches. */
   readonly register: number;
   readonly kind: TrackKind;
@@ -125,20 +139,26 @@ interface SeedSpec {
 }
 
 const SEED: readonly SeedSpec[] = [
-  // Melodic first, spread across three registers, and polymetric against the
-  // kit below. Two tracks share the middle register deliberately — their loop
-  // lengths (8 and 7) drift against each other, so they interleave rather than
-  // collide.
-  { pulses: 4, steps: 16, register: -12, kind: 'voice', drum: 'kick' }, // bass
-  { pulses: 5, steps: 8, register: 0, kind: 'voice', drum: 'kick' },
-  { pulses: 3, steps: 7, register: 0, kind: 'voice', drum: 'kick' },
-  { pulses: 5, steps: 13, register: 12, kind: 'voice', drum: 'kick' },
-  // The kit. E(4,16) is four-on-the-floor; E(8,16) is eighth-note hats.
-  // Register is unused on a rhythm track — drums ignore pitch.
-  { pulses: 4, steps: 16, register: 0, kind: 'rhythm', drum: 'kick' },
-  { pulses: 3, steps: 16, register: 0, kind: 'rhythm', drum: 'clap' },
-  { pulses: 8, steps: 16, register: 0, kind: 'rhythm', drum: 'hat' },
-  { pulses: 5, steps: 16, register: 0, kind: 'rhythm', drum: 'rim' },
+  // Two melodic tracks: a bass, and a lead whose 7-step loop drifts against
+  // the bass's 16 (they realign after lcm(16,7) = 112 steps, about 7 bars).
+  { pulses: 4, steps: 16, rotation: 0, register: -12, kind: 'voice', drum: 'kick' },
+  { pulses: 4, steps: 7, rotation: 0, register: 0, kind: 'voice', drum: 'kick' },
+
+  // Six percussion tracks, one drum each, in kit order.
+  //
+  // Two of them use rotation, and it is load-bearing rather than decorative:
+  // E(2,16) is maximally even only at phase 0, which puts its onsets on beats
+  // 1 and 3. A backbeat needs beats 2 and 4, so rotation is the only way to
+  // place it — the pattern's *shape* is fixed, only its phase moves.
+  //
+  // Register is unused on a rhythm track; drums ignore pitch.
+  { pulses: 4, steps: 16, rotation: 0, register: 0, kind: 'rhythm', drum: 'kick' }, // four-on-the-floor
+  { pulses: 2, steps: 16, rotation: 4, register: 0, kind: 'rhythm', drum: 'snare' }, // backbeat
+  { pulses: 8, steps: 16, rotation: 0, register: 0, kind: 'rhythm', drum: 'hat' }, // eighth notes
+  { pulses: 2, steps: 16, rotation: 2, register: 0, kind: 'rhythm', drum: 'clap' }, // offbeat
+  // Odd loop lengths, so the percussion drifts against the four-four kit.
+  { pulses: 2, steps: 5, rotation: 0, register: 0, kind: 'rhythm', drum: 'tom' },
+  { pulses: 3, steps: 7, rotation: 0, register: 0, kind: 'rhythm', drum: 'rim' },
 ];
 
 /**
@@ -194,13 +214,15 @@ export function euclidCells(
 export function generateCells(opts: {
   readonly pulses: number;
   readonly steps: number;
+  /** Phase offset in steps. See `TrackState.rotation`. */
+  readonly rotation?: number | undefined;
   readonly seed: number;
   readonly mix: PitchMix;
   readonly root: number;
   readonly scale: ScaleName;
   readonly register: number;
 }): Cells {
-  const gate = euclid(opts.pulses, opts.steps);
+  const gate = euclid(opts.pulses, opts.steps, opts.rotation ?? 0);
   return pitchMixer(
     // The store's root and scale are the single source of truth; the mix's own
     // copies are overridden so a scale change in the transport bar applies to
@@ -214,7 +236,7 @@ export function generateCells(opts: {
 
 function seedTrack(index: number, root: number, scale: ScaleName): TrackState {
   const pattern: SeedSpec = SEED[index % SEED.length] ?? {
-    pulses: 4, steps: 16, register: 0, kind: 'voice', drum: 'kick',
+    pulses: 4, steps: 16, rotation: 0, register: 0, kind: 'voice', drum: 'kick',
   };
   return {
     id: `track-${index + 1}`,
@@ -222,6 +244,7 @@ function seedTrack(index: number, root: number, scale: ScaleName): TrackState {
     cells: generateCells({
       pulses: pattern.pulses,
       steps: pattern.steps,
+      rotation: pattern.rotation,
       seed: combineSeed(index, pattern.pulses, pattern.steps),
       mix: DEFAULT_MIX,
       root,
@@ -236,6 +259,7 @@ function seedTrack(index: number, root: number, scale: ScaleName): TrackState {
     kind: pattern.kind,
     drum: pattern.drum ?? DEFAULT_KIT[index % DEFAULT_KIT.length] ?? 'kick',
     register: pattern.register,
+    rotation: pattern.rotation,
   };
 }
 
@@ -296,6 +320,10 @@ export const useGr00ve = create<Gr00veState>()(
       const cells = generateCells({
         pulses,
         steps,
+        // Preserved from the track, so re-generating a backbeat keeps it on
+        // beats 2 and 4 rather than snapping it back to the even-but-wrong
+        // phase 0 the pattern shape alone would give.
+        rotation: track.rotation,
         // Seeded from the parameters: idempotent for a given E(k,n), but still
         // responsive to the pitch faders, because the weights changed even
         // though the random stream did not.

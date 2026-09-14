@@ -370,3 +370,35 @@ test('euclidize sets the loop length to the generated grid', () => {
   assert.equal(s().tracks[6]?.cells.length, 12);
   assert.equal(s().tracks[6]?.length, 12);
 });
+
+test('euclidize preserves the track rotation', () => {
+  // The backbeat case. E(2,16) is maximally even only at phase 0, which puts
+  // its two onsets on beats 1 and 3; rotation 4 moves them to 2 and 4. If the
+  // rotation were dropped on regenerate, the snare would silently slide back
+  // off the backbeat — which is exactly the sort of thing that reads as the
+  // sequencer being subtly wrong rather than as a missing parameter.
+  useGr00ve.setState({
+    tracks: s().tracks.map((t, i) => (i === 3 ? { ...t, rotation: 4 } : t)),
+  });
+
+  s().euclidize(3, 2, 16);
+
+  const steps = (s().tracks[3]?.cells ?? [])
+    .map((cell, i) => (cell === null ? null : i))
+    .filter((i): i is number => i !== null);
+  assert.deepEqual(steps, [4, 12]);
+});
+
+test('a different rotation moves the same pattern to a different phase', () => {
+  // Same shape, different phase — the property that makes rotation useful.
+  useGr00ve.setState({
+    tracks: s().tracks.map((t, i) => (i === 3 ? { ...t, rotation: 0 } : t)),
+  });
+  s().euclidize(3, 2, 16);
+  const phase0 = (s().tracks[3]?.cells ?? [])
+    .map((c, i) => (c === null ? null : i))
+    .filter((i): i is number => i !== null);
+  assert.deepEqual(phase0, [0, 8]);
+  // Two onsets either way — rotation is phase, not density.
+  assert.equal(phase0.length, 2);
+});
