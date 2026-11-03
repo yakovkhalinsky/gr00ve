@@ -63,11 +63,19 @@ body {
 }
 .transport__play[aria-pressed='true'] { background: var(--accent); border-color: var(--accent); }
 
+.transport__links {
+  /* Pushes the pair to the right edge now that there are two of them. */
+  display: flex;
+  gap: 16px;
+  margin-left: auto;
+  align-items: center;
+}
+
 .transport__help {
   align-self: center;
-  /* Pushes to the right edge, now that the scale selector has moved out of the
-   * transport bar and taken its `margin-left: auto` with it. */
-  margin-left: auto;
+  /* Inside `.transport__links` the group owns the auto margin; outside it (if a
+   * future layout links straight from the bar) this keeps the old behaviour. */
+  margin-left: 0;
   font-size: 12px;
   color: var(--muted);
   text-decoration: underline;

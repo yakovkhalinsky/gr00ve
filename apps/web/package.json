@@ -18,6 +18,7 @@
     "@gr00ve/audio": "workspace:*",
     "@gr00ve/core": "workspace:*",
     "@gr00ve/midi": "workspace:*",
+    "@gr00ve/tracker": "workspace:*",
     "marked": "^18.0.13",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
