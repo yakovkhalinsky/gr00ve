@@ -1,0 +1,26 @@
+{
+  "name": "@gr00ve/tracker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Generative pattern model and Polyend Tracker .mtp export — pure, no DOM.",
+  "engines": {
+    "node": ">=24"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p .",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@gr00ve/core": "workspace:*",
+    "@polyend/tracker-lib": "^0.1.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.4",
+    "typescript": "^7.0.2"
+  }
+}

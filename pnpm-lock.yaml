@@ -19,6 +19,9 @@ importers:
       '@gr00ve/midi':
         specifier: workspace:*
         version: link:../../packages/midi
+      '@gr00ve/tracker':
+        specifier: workspace:*
+        version: link:../../packages/tracker
       marked:
         specifier: ^18.0.13
         version: 18.0.13
@@ -85,10 +88,30 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
 
+  packages/tracker:
+    dependencies:
+      '@gr00ve/core':
+        specifier: workspace:*
+        version: link:../core
+      '@polyend/tracker-lib':
+        specifier: ^0.1.2
+        version: 0.1.2
+    devDependencies:
+      '@types/node':
+        specifier: ^24.13.4
+        version: 24.13.4
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
 packages:
 
   '@oxc-project/types@0.149.0':
     resolution: {integrity: sha512-Efcc+iF0j3Bf67YjEqIqWXbX5XddXoK/Mw4K1/JuXwRCZ8N16VR7iT23nlCc9XrveFVh/E5Rqs2StT0V8v9LdA==}
+
+  '@polyend/tracker-lib@0.1.2':
+    resolution: {integrity: sha512-h6nsJPa6O87emlMnAm4trs357iLGZk7Gbro8bEUR93qEOsM2gjzZgXwiAWZ/lvtOl8ZS2yqiUrcY/qTH2yr28g==}
+    engines: {node: '>=20.0.0'}
 
   '@rolldown/binding-android-arm-eabi@1.2.8':
     resolution: {integrity: sha512-tN5aztYkKCte4i5SIrrz5yK/HMjEuCqCSCJa418jOV8tZ1cBY3YF2otxB1ktPxzsLA1BeTqwapK0bfjxNvHJVw==}
@@ -585,6 +608,8 @@ packages:
 snapshots:
 
   '@oxc-project/types@0.149.0': {}
+
+  '@polyend/tracker-lib@0.1.2': {}
 
   '@rolldown/binding-android-arm-eabi@1.2.8':
     optional: true
