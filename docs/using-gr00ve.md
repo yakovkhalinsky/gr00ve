@@ -251,6 +251,54 @@ Two things to know:
 
 ---
 
+## Polyend Tracker export
+
+The **Tracker .mtp export** link in the transport bar opens a separate page that
+writes a Polyend Tracker pattern file for a **Tracker Mini / Tracker+ on
+Community Edition firmware** ([open it here](tracker.html)). It is a generator
+and a file writer, not a second sequencer: the eight tracks there do not share
+state with the live rack.
+
+- **Five generators, per track** — Euclidean (hits, cycle, rotation), per-step
+  probability, a Turing-machine loop (length, mutation, lock), a
+  scale-quantised random walk (root, scale, range, step size) and an optional
+  first-order Markov chain.
+- **16, 32, 64 or 128 steps**, one instrument slot per track (0–47), and
+  velocity variation.
+- **Seeded and reproducible.** Regenerate advances the seed; Mutate evolves a
+  Turing loop; Lock stops it drifting.
+- **Step FX only where the code is documented**: **C** Chance (index 4),
+  **R** Roll (index 3), **m** Micro-move (index 2) and **V** Volume/Velocity
+  (index 18). The page lists the exact `tracker-lib` / Tracker CE source lines
+  and what was deliberately left out.
+- **Grid and preview.** The preview plays gr00ve's synth voice, not the
+  Tracker's instruments; velocity is approximated as accent, and non-constant
+  roll types are heard as even repeats.
+
+### Getting the file onto the Tracker
+
+1. **Back up `Projects/<YourProject>/` from the SD card first.** Saving a
+   project on Community Edition rewrites its patterns as version 6, which older
+   firmware cannot read; the backup is the only way back.
+2. Put the download in `Projects/<YourProject>/patterns/`, named
+   `pattern_XX.mtp`, where `XX` is a pattern number from **01 to 255**. The
+   firmware builds that path with `pattern_%02d.mtp`.
+3. **Replace an existing pattern file if you can.** The project's `project.mt`
+   records which pattern slots are occupied, so a brand-new file may not appear
+   in the pattern list. Save a throwaway pattern into that slot on the device
+   first, then swap the file on the card.
+4. The `.mtp` carries instrument **slot numbers**, not samples. Load the
+   instruments you want into slots 0–47 in the project, or the notes will be
+   silent.
+5. Eject safely, open the project, and select the pattern.
+
+The file is written in the **version-5 layout** (16 tracks, six-byte steps);
+Community Edition translates it to its version-6 layout on load. Tempo and
+swing are not part of a pattern file — they live in the project — so the page's
+BPM and Swing controls are for the preview only.
+
+---
+
 ## Controls
 
 ### Knobs
@@ -291,7 +339,9 @@ Things that are missing rather than hidden:
   was saved — but toggling a step or moving the Loop knob happens live and is
   not recorded. Stepping through versions will discard edits made since the last
   generate.
-- **No saving.** A page reload loses everything. There's no export yet either.
+- **No saving for the live rack.** A page reload loses everything, and the live
+  sequencer has no export. The separate **Tracker .mtp export** page is the one
+  way out, and it exports patterns only — not the live rack's state.
 - **The generator panel is below the tracks**, so the `k` and `n` that E(k,n)
   uses are off-screen when you press it. A layout wart.
 - **No MIDI input.** Nothing responds to a hardware controller yet. The mapping
