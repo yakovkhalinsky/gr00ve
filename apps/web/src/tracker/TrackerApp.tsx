@@ -656,8 +656,11 @@ export function TrackerApp(): React.JSX.Element {
           Off, Random Note/Instrument/Volume/FX, MIDI CC A–F, Break Pattern, MIDI Chord,
           Tempo, Swing, Glide, Gate Length, Arp, Position, the LFO selectors, Slice,
           Reverse, the filters, Delay/Reverb Send, Panning, Overdrive, Bit Depth, Tune,
-          Slide Up/Down, and the CE-only wavetable/granular envelopes. The page writes only
-          the four codes above, each traceable to the sources in the table.
+          Slide Up/Down, and the CE-only wavetable/granular envelopes. Also left out are
+          CE's conditional Chance modes (values 101–127: Group with Last, Not Last,
+          Play/Skip and Skip/Play), because tracker-lib documents Chance only as 0–100.
+          The page writes only the four codes above, each traceable to the sources in
+          the table.
         </p>
 
         <h2>What the export is and is not</h2>
