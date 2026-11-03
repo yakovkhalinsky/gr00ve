@@ -31,12 +31,14 @@ export default defineConfig({
     target: 'es2023',
     sourcemap: true,
     rollupOptions: {
-      // Two pages: the sequencer, and the guide. Multi-page rather than a route
-      // inside the app, because the guide should be readable and linkable
-      // without loading an audio application first.
+      // Three pages: the sequencer, the guide, and the Tracker .mtp exporter.
+      // Multi-page rather than routes inside the app, because each should be
+      // readable and linkable without loading an audio application first, and
+      // the exporter is a different instrument with its own state.
       input: {
         main: `${here}index.html`,
         guide: `${here}guide.html`,
+        tracker: `${here}tracker.html`,
       },
     },
   },

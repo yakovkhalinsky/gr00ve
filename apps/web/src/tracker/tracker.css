@@ -1,0 +1,309 @@
+/* The Tracker export page.
+ *
+ * Shares the palette and the knob styles with the sequencer, but not its
+ * density: this page is a generator and a document, so the grid is a read-out
+ * rather than a row of 44px hit targets. That is a deliberate exception to the
+ * app's touch-target rule — nothing here is meant to be played by thumb, and a
+ * 128-step pattern at 44px per cell would be 5.6 metres wide.
+ */
+
+.tk {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.tk-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px 18px;
+  padding: 14px 18px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.tk-bar h1 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 650;
+}
+
+.tk-kicker {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.tk-back {
+  color: var(--muted);
+  font-size: 12px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.tk-back:hover { color: var(--text); }
+
+.tk-help {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  white-space: nowrap;
+}
+
+.tk-play,
+.tk-generate,
+.tk-export,
+.tk-track__edit,
+.tk-buttons button {
+  min-height: 34px;
+  padding: 0 12px;
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  font: inherit;
+  cursor: pointer;
+}
+.tk-play[aria-pressed='true'] { background: var(--accent); border-color: var(--accent); }
+.tk-export { background: var(--on); border-color: var(--on); font-weight: 600; }
+.tk-generate { font-weight: 600; }
+
+.tk-status {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* --- fields -------------------------------------------------------------- */
+
+.tk-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.tk-field input,
+.tk-field select {
+  min-height: 32px;
+  padding: 4px 7px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font: inherit;
+}
+.tk-field input[type='number'] { width: 84px; }
+.tk-field small { color: var(--muted); font-size: 10px; }
+
+.tk-toggleRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin: 8px 0 12px;
+}
+
+.tk-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--text);
+}
+.tk-toggle input { width: 16px; height: 16px; accent-color: var(--accent); }
+.tk-toggle input:disabled + span { color: var(--muted); }
+
+/* --- tracks and grid ----------------------------------------------------- */
+
+.tk-tracks {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tk-track {
+  padding: 10px 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+}
+.tk-track.is-selected { border-color: var(--accent); }
+
+.tk-track__head {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  margin-bottom: 8px;
+}
+
+.tk-track__name {
+  align-self: center;
+  min-width: 88px;
+  min-height: 34px;
+  padding: 0 10px;
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.tk-track.is-selected .tk-track__name { background: var(--accent); border-color: var(--accent); }
+
+.tk-track__gen {
+  align-self: center;
+  min-width: 150px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.tk-track__edit { align-self: flex-end; }
+
+.tk-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  /* 128 steps is 8 rows of 16; the grid never scrolls sideways at this size. */
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.tk-grid__row { display: flex; gap: 2px; }
+
+.tk-cell {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 46px;
+  height: 30px;
+  overflow: hidden;
+  color: var(--muted);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-size: 9px;
+  line-height: 1.05;
+  white-space: nowrap;
+}
+.tk-cell[data-downbeat='true'] { border-left: 2px solid #3c3c4a; }
+.tk-cell.is-on {
+  color: var(--text);
+  background: #263a63;
+  border-color: #3f6fd8;
+}
+.tk-cell.is-playing {
+  outline: 2px solid var(--text);
+  outline-offset: -2px;
+}
+.tk-cell--pad { visibility: hidden; }
+
+.tk-cell__note { font-size: 10px; font-weight: 600; }
+.tk-cell__fx { color: #e8b06a; font-size: 8px; }
+
+/* --- editor -------------------------------------------------------------- */
+
+.tk-editor {
+  padding: 14px 18px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.tk-editor h2 { margin: 0 0 10px; font-size: 16px; }
+.tk-editor h3 { margin: 14px 0 4px; font-size: 13px; color: var(--muted); }
+
+.tk-editor__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 14px 18px;
+}
+
+.tk-hint {
+  flex-basis: 100%;
+  max-width: 78ch;
+  margin: 2px 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.tk-bits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  align-self: center;
+  max-width: 220px;
+}
+.tk-bit {
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--panel-2);
+}
+.tk-bit.is-on { background: var(--accent); border-color: var(--accent); }
+
+.tk-buttons { display: flex; gap: 8px; align-self: center; }
+
+.tk-fx { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 4px; }
+
+.tk-fxGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  width: 100%;
+}
+
+.tk-fxGroup {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 230px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.tk-fxGroup[data-on='false'] { opacity: 0.5; }
+.tk-fxGroup legend { padding: 0 4px; font-size: 12px; color: var(--muted); }
+.tk-fxGroup .tk-field { min-width: 92px; }
+
+/* --- documentation ------------------------------------------------------- */
+
+.tk-doc {
+  padding: 16px 20px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.tk-doc h2 { margin: 18px 0 8px; font-size: 16px; }
+.tk-doc h2:first-child { margin-top: 0; }
+.tk-doc code {
+  padding: 1px 4px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-size: 0.92em;
+  white-space: nowrap;
+}
+.tk-doc ol, .tk-doc ul { margin: 6px 0; padding-left: 22px; }
+.tk-doc li { margin: 6px 0; }
+.tk-doc table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+.tk-doc th, .tk-doc td {
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+.tk-doc th { background: var(--panel-2); font-size: 12px; }
+.tk-doc td { font-size: 12px; }

@@ -93,12 +93,17 @@ export function App(): React.JSX.Element {
         <Knob label="Swing" value={swing} min={0} max={0.9} step={1 / 90} onChange={setSwing}
           format={(v) => (v === 0 ? 'straight' : `${Math.round(v * 100)}%`)} />
 
-        {/* The guide is its own page in this deployment, built from the same
-          * markdown the repo holds. Base-aware, so it resolves at `/` in dev
-          * and `/gr00ve/` on Pages. */}
-        <a className="transport__help" href={`${import.meta.env.BASE_URL}guide.html`}>
-          How to use this
-        </a>
+        {/* The guide and the Tracker exporter are their own pages in this
+          * deployment, built from the same repo. Base-aware, so they resolve at
+          * `/` in dev and `/gr00ve/` on Pages. */}
+        <div className="transport__links">
+          <a className="transport__help" href={`${import.meta.env.BASE_URL}tracker.html`}>
+            Tracker .mtp export
+          </a>
+          <a className="transport__help" href={`${import.meta.env.BASE_URL}guide.html`}>
+            How to use this
+          </a>
+        </div>
       </header>
 
       <MidiPanel />
